@@ -1,1 +1,786 @@
-<p>debris</p>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Debris labeling PoC</title>
+  <style>
+    :root {
+      --ink: #1c2418;
+      --muted: #5c6756;
+      --line: #d5dccf;
+      --bg: #eef1ea;
+      --card: #fff;
+      --accent: #2f6b3a;
+      --accent-ink: #fff;
+      --warn: #8a5a12;
+      --warn-bg: #f8ecd6;
+      --ok: #215c32;
+      --ok-bg: #dff3e4;
+      --bad: #8b2e24;
+      --bad-bg: #f8d9d4;
+      --pending: #c45c12;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; }
+    body {
+      font: 16px/1.4 system-ui, sans-serif;
+      color: var(--ink);
+      background: var(--bg);
+    }
+    header, main { max-width: 42rem; margin: 0 auto; }
+    header { padding: 1rem 1rem 0.25rem; }
+    header h1 { font-size: 1.15rem; margin: 0 0 0.25rem; }
+    header p { margin: 0; color: var(--muted); font-size: 0.9rem; }
+    main { padding: 0.75rem 1rem 6.5rem; display: grid; gap: 0.75rem; }
+    .row { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+    button, select, label.btn {
+      font: inherit;
+      min-height: 44px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: var(--card);
+      color: var(--ink);
+      padding: 0.4rem 0.75rem;
+    }
+    button.primary, label.btn.primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: var(--accent-ink);
+    }
+    button:disabled, label.btn.disabled { opacity: 0.5; pointer-events: none; }
+    button.active { outline: 2px solid var(--accent); }
+    input[type="file"] { display: none; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 0.75rem;
+    }
+    .hint { color: var(--muted); font-size: 0.88rem; margin: 0; }
+    .frame-wrap { overflow: auto; }
+    .frame {
+      position: relative;
+      display: block;
+      width: 100%;
+      min-height: 12rem;
+      background: #dfe5d8;
+      touch-action: none;
+      user-select: none;
+    }
+    .frame.empty {
+      display: grid;
+      place-items: center;
+      color: var(--muted);
+      padding: 2rem 1rem;
+      text-align: center;
+    }
+    .frame img { display: block; width: 100%; height: auto; vertical-align: middle; }
+    .overlay { position: absolute; inset: 0; }
+    .box {
+      position: absolute;
+      border: 2px dashed var(--pending);
+      background: color-mix(in srgb, var(--pending) 16%, transparent);
+    }
+    .box.confirmed {
+      border-style: solid;
+      border-color: var(--accent);
+      background: color-mix(in srgb, var(--accent) 14%, transparent);
+    }
+    .box.selected {
+      border-width: 3px;
+      z-index: 2;
+    }
+    .tag {
+      position: absolute;
+      left: -2px;
+      top: -1.35rem;
+      background: #1c2418;
+      color: #fff;
+      font-size: 0.72rem;
+      line-height: 1.2;
+      padding: 0.12rem 0.35rem;
+      border-radius: 4px;
+      white-space: nowrap;
+      max-width: 14rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      pointer-events: none;
+    }
+    .handle {
+      position: absolute;
+      width: 22px;
+      height: 22px;
+      background: #fff;
+      border: 2px solid var(--ink);
+      border-radius: 3px;
+    }
+    .handle.nw { left: -11px; top: -11px; }
+    .handle.ne { right: -11px; top: -11px; }
+    .handle.sw { left: -11px; bottom: -11px; }
+    .handle.se { right: -11px; bottom: -11px; }
+    .list { display: grid; gap: 0.5rem; margin: 0.5rem 0 0; padding: 0; list-style: none; }
+    .item {
+      display: grid;
+      gap: 0.4rem;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 0.5rem;
+    }
+    .item.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+    .item-top { display: flex; gap: 0.4rem; align-items: center; }
+    .item-top select { flex: 1; min-width: 0; }
+    .swatch { width: 10px; height: 2rem; border-radius: 3px; flex: none; }
+    .status {
+      display: none;
+      border-radius: 8px;
+      padding: 0.65rem 0.75rem;
+      font-size: 0.92rem;
+    }
+    .status.show { display: block; }
+    .status.ok { background: var(--ok-bg); color: var(--ok); }
+    .status.bad { background: var(--bad-bg); color: var(--bad); }
+    .status.warn { background: var(--warn-bg); color: var(--warn); }
+    .submit-bar {
+      position: fixed;
+      left: 0; right: 0; bottom: 0;
+      background: var(--card);
+      border-top: 1px solid var(--line);
+      padding: 0.65rem 1rem calc(0.65rem + env(safe-area-inset-bottom));
+    }
+    .submit-inner {
+      max-width: 42rem;
+      margin: 0 auto;
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
+    .submit-inner button { flex: 1; }
+    .count { font-size: 0.85rem; color: var(--muted); }
+    details { margin-top: 0.5rem; }
+    pre {
+      margin: 0.4rem 0 0;
+      max-height: 10rem;
+      overflow: auto;
+      font-size: 0.72rem;
+      background: #f6f7f4;
+      padding: 0.5rem;
+      border-radius: 6px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Debris photo labeling</h1>
+    <p>Human-in-the-loop PoC. Confirm or fix mock YOLO boxes, then resubmit.</p>
+  </header>
+  <main>
+    <div class="row">
+      <label class="btn primary" for="camera">Take photo</label>
+      <label class="btn" for="upload">Upload image</label>
+      <input id="camera" type="file" accept="image/*" capture="environment">
+      <input id="upload" type="file" accept="image/*">
+    </div>
+
+    <section class="card" aria-label="Photo and detections">
+      <p id="hint" class="hint">Take a photo or upload an image to start.</p>
+      <div class="frame-wrap">
+        <div id="frame" class="frame empty">No photo yet</div>
+      </div>
+    </section>
+
+    <section class="card" aria-label="Location">
+      <strong>Location</strong>
+      <p id="location" class="hint">Location not attached</p>
+    </section>
+
+    <section class="card" aria-label="Annotations">
+      <div class="row">
+        <button id="addBox" type="button" disabled>Add box</button>
+        <button id="cancelDraw" type="button" hidden>Cancel draw</button>
+      </div>
+      <ul id="list" class="list"></ul>
+    </section>
+
+    <p id="status" class="status" role="status"></p>
+    <details id="payloadDetails" hidden>
+      <summary>Last request body</summary>
+      <pre id="payloadPre"></pre>
+    </details>
+  </main>
+
+  <div class="submit-bar">
+    <div class="submit-inner">
+      <button id="resubmit" class="primary" type="button" disabled>Resubmit</button>
+      <span id="count" class="count">0 confirmed</span>
+    </div>
+  </div>
+
+  <script>
+    const LABELS = [
+      "fallen tree",
+      "damaged building",
+      "rubble pile",
+      "downed power line"
+    ];
+    const COLORS = {
+      "fallen tree": "#2f6b3a",
+      "damaged building": "#a33b2b",
+      "rubble pile": "#8a5a12",
+      "downed power line": "#4b3f8a"
+    };
+
+    const cameraInput = document.getElementById("camera");
+    const uploadInput = document.getElementById("upload");
+    const frame = document.getElementById("frame");
+    const hint = document.getElementById("hint");
+    const locationEl = document.getElementById("location");
+    const listEl = document.getElementById("list");
+    const addBoxBtn = document.getElementById("addBox");
+    const cancelDrawBtn = document.getElementById("cancelDraw");
+    const resubmitBtn = document.getElementById("resubmit");
+    const countEl = document.getElementById("count");
+    const statusEl = document.getElementById("status");
+    const payloadDetails = document.getElementById("payloadDetails");
+    const payloadPre = document.getElementById("payloadPre");
+
+    let imageFile = null;
+    let imageUrl = null;
+    let imageMeta = { width: 0, height: 0, location: null };
+    let boxes = [];
+    let selectedId = null;
+    let drawing = false;
+    let drawMode = false;
+    let drag = null;
+    let idSeq = 1;
+
+    function uid() {
+      return "b" + (idSeq++);
+    }
+
+    function clamp(n, min, max) {
+      return Math.max(min, Math.min(max, n));
+    }
+
+    function mockDetections() {
+      return [
+        { id: uid(), label: "fallen tree", originalLabel: "fallen tree", source: "yolo", confidence: 0.91, x: 0.07, y: 0.16, w: 0.40, h: 0.30, confirmed: false },
+        { id: uid(), label: "damaged building", originalLabel: "damaged building", source: "yolo", confidence: 0.84, x: 0.52, y: 0.10, w: 0.41, h: 0.46, confirmed: false },
+        { id: uid(), label: "rubble pile", originalLabel: "rubble pile", source: "yolo", confidence: 0.76, x: 0.14, y: 0.58, w: 0.38, h: 0.28, confirmed: false },
+        { id: uid(), label: "downed power line", originalLabel: "downed power line", source: "yolo", confidence: 0.61, x: 0.58, y: 0.66, w: 0.34, h: 0.20, confirmed: false }
+      ];
+    }
+
+    function setStatus(kind, text) {
+      statusEl.className = "status show " + kind;
+      statusEl.textContent = text;
+    }
+
+    function clearStatus() {
+      statusEl.className = "status";
+      statusEl.textContent = "";
+    }
+
+    function confirmedCount() {
+      return boxes.filter((b) => b.confirmed).length;
+    }
+
+    function updateCount() {
+      const n = confirmedCount();
+      countEl.textContent = n + " confirmed";
+      resubmitBtn.disabled = !imageFile || n === 0;
+    }
+
+    function toNorm(clientX, clientY, overlay) {
+      const r = overlay.getBoundingClientRect();
+      return {
+        x: clamp((clientX - r.left) / r.width, 0, 1),
+        y: clamp((clientY - r.top) / r.height, 0, 1)
+      };
+    }
+
+    function overlayEl() {
+      return frame.querySelector(".overlay");
+    }
+
+    function render() {
+      const overlay = overlayEl();
+      if (overlay) {
+        overlay.innerHTML = "";
+        boxes.forEach((box) => overlay.appendChild(renderBox(box)));
+      }
+      renderList();
+      updateCount();
+    }
+
+    function renderBox(box) {
+      const el = document.createElement("div");
+      el.className = "box" + (box.confirmed ? " confirmed" : "") + (box.id === selectedId ? " selected" : "");
+      el.style.left = (box.x * 100) + "%";
+      el.style.top = (box.y * 100) + "%";
+      el.style.width = (box.w * 100) + "%";
+      el.style.height = (box.h * 100) + "%";
+      el.style.borderColor = box.confirmed ? COLORS[box.label] || "var(--accent)" : "var(--pending)";
+      el.style.background = colorFill(box);
+      el.dataset.id = box.id;
+
+      const tag = document.createElement("div");
+      tag.className = "tag";
+      const conf = box.source === "yolo" && box.confidence != null && !box.confirmed
+        ? " " + Math.round(box.confidence * 100) + "%"
+        : "";
+      tag.textContent = box.label + conf;
+      el.appendChild(tag);
+
+      if (box.id === selectedId) {
+        ["nw", "ne", "sw", "se"].forEach((corner) => {
+          const handle = document.createElement("div");
+          handle.className = "handle " + corner;
+          handle.dataset.corner = corner;
+          handle.addEventListener("pointerdown", onHandleDown);
+          el.appendChild(handle);
+        });
+      }
+
+      el.addEventListener("pointerdown", onBoxDown);
+      return el;
+    }
+
+    function colorFill(box) {
+      const c = COLORS[box.label] || "#2f6b3a";
+      return box.confirmed ? c + "24" : "#c45c1228";
+    }
+
+    function renderList() {
+      listEl.innerHTML = "";
+      if (!boxes.length) return;
+      boxes.forEach((box) => {
+        const li = document.createElement("li");
+        li.className = "item" + (box.id === selectedId ? " selected" : "");
+        li.innerHTML =
+          '<div class="item-top">' +
+            '<span class="swatch" style="background:' + (COLORS[box.label] || "#2f6b3a") + '"></span>' +
+            '<select data-id="' + box.id + '" aria-label="Label"></select>' +
+            '<button type="button" data-confirm="' + box.id + '">' + (box.confirmed ? "Undo" : "Confirm") + "</button>" +
+            '<button type="button" data-delete="' + box.id + '" aria-label="Delete">Delete</button>' +
+          "</div>" +
+          '<p class="hint">' + (box.source === "yolo" ? "YOLO suggestion" : "Added by you") +
+            (box.confidence != null ? " · " + Math.round(box.confidence * 100) + "% " : " · ") +
+            (box.confirmed ? "confirmed (ground truth)" : "unconfirmed") + "</p>";
+        const select = li.querySelector("select");
+        LABELS.forEach((label) => {
+          const opt = document.createElement("option");
+          opt.value = label;
+          opt.textContent = label;
+          if (label === box.label) opt.selected = true;
+          select.appendChild(opt);
+        });
+        if (!LABELS.includes(box.label)) {
+          const opt = document.createElement("option");
+          opt.value = box.label;
+          opt.textContent = box.label;
+          opt.selected = true;
+          select.appendChild(opt);
+        }
+        select.addEventListener("change", () => {
+          box.label = select.value;
+          render();
+        });
+        li.querySelector("[data-confirm]").addEventListener("click", () => {
+          box.confirmed = !box.confirmed;
+          selectedId = box.id;
+          render();
+        });
+        li.querySelector("[data-delete]").addEventListener("click", () => deleteBox(box.id));
+        li.addEventListener("click", (e) => {
+          if (e.target.closest("button, select")) return;
+          selectedId = box.id;
+          render();
+        });
+        listEl.appendChild(li);
+      });
+    }
+
+    function deleteBox(id) {
+      boxes = boxes.filter((b) => b.id !== id);
+      if (selectedId === id) selectedId = null;
+      render();
+    }
+
+    function onBoxDown(e) {
+      if (e.target.classList.contains("handle") || drawMode) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const id = e.currentTarget.dataset.id;
+      const box = boxes.find((b) => b.id === id);
+      selectedId = id;
+      const overlay = overlayEl();
+      overlay.querySelectorAll(".box").forEach((el) => {
+        el.classList.toggle("selected", el.dataset.id === id);
+      });
+      renderList();
+      const start = toNorm(e.clientX, e.clientY, overlay);
+      drag = { type: "move", id, start, orig: { x: box.x, y: box.y, w: box.w, h: box.h } };
+    }
+
+    function onHandleDown(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      const boxEl = e.currentTarget.parentElement;
+      const id = boxEl.dataset.id;
+      const box = boxes.find((b) => b.id === id);
+      selectedId = id;
+      drag = {
+        type: "resize",
+        id,
+        corner: e.currentTarget.dataset.corner,
+        orig: { x: box.x, y: box.y, w: box.w, h: box.h }
+      };
+    }
+
+    function onOverlayDown(e) {
+      if (!drawMode) {
+        if (e.target === overlayEl()) {
+          selectedId = null;
+          render();
+        }
+        return;
+      }
+      e.preventDefault();
+      e.stopPropagation();
+      const overlay = overlayEl();
+      const p = toNorm(e.clientX, e.clientY, overlay);
+      const box = {
+        id: uid(),
+        label: LABELS[0],
+        originalLabel: null,
+        source: "user",
+        confidence: null,
+        x: p.x,
+        y: p.y,
+        w: 0.02,
+        h: 0.02,
+        confirmed: false
+      };
+      boxes.push(box);
+      selectedId = box.id;
+      drawing = true;
+      drag = { type: "draw", id: box.id, start: p };
+      render();
+    }
+
+    function onPointerMove(e) {
+      if (!drag) return;
+      e.preventDefault();
+      const overlay = overlayEl();
+      if (!overlay) return;
+      const p = toNorm(e.clientX, e.clientY, overlay);
+      const box = boxes.find((b) => b.id === drag.id);
+      if (!box) return;
+
+      if (drag.type === "move") {
+        box.x = clamp(drag.orig.x + (p.x - drag.start.x), 0, 1 - drag.orig.w);
+        box.y = clamp(drag.orig.y + (p.y - drag.start.y), 0, 1 - drag.orig.h);
+      } else if (drag.type === "draw") {
+        const x0 = Math.min(drag.start.x, p.x);
+        const y0 = Math.min(drag.start.y, p.y);
+        box.x = x0;
+        box.y = y0;
+        box.w = Math.abs(p.x - drag.start.x);
+        box.h = Math.abs(p.y - drag.start.y);
+      } else if (drag.type === "resize") {
+        resizeBox(box, drag.orig, drag.corner, p);
+      }
+      const overlayNow = overlayEl();
+      const el = overlayNow && overlayNow.querySelector('[data-id="' + box.id + '"]');
+      if (el) {
+        el.style.left = (box.x * 100) + "%";
+        el.style.top = (box.y * 100) + "%";
+        el.style.width = (box.w * 100) + "%";
+        el.style.height = (box.h * 100) + "%";
+      }
+    }
+
+    function resizeBox(box, orig, corner, p) {
+      let x1 = orig.x;
+      let y1 = orig.y;
+      let x2 = orig.x + orig.w;
+      let y2 = orig.y + orig.h;
+      if (corner.indexOf("w") !== -1) x1 = p.x;
+      if (corner.indexOf("e") !== -1) x2 = p.x;
+      if (corner.indexOf("n") !== -1) y1 = p.y;
+      if (corner.indexOf("s") !== -1) y2 = p.y;
+      const min = 0.04;
+      box.x = Math.min(x1, x2);
+      box.y = Math.min(y1, y2);
+      box.w = Math.max(min, Math.abs(x2 - x1));
+      box.h = Math.max(min, Math.abs(y2 - y1));
+      box.x = clamp(box.x, 0, 1 - box.w);
+      box.y = clamp(box.y, 0, 1 - box.h);
+    }
+
+    function onPointerUp() {
+      if (!drag) return;
+      if (drag.type === "draw") {
+        const box = boxes.find((b) => b.id === drag.id);
+        if (box && (box.w < 0.03 || box.h < 0.03)) {
+          boxes = boxes.filter((b) => b.id !== box.id);
+          selectedId = null;
+        }
+        setDrawMode(false);
+      }
+      drag = null;
+      drawing = false;
+      render();
+    }
+
+    function setDrawMode(on) {
+      drawMode = on;
+      addBoxBtn.hidden = on;
+      cancelDrawBtn.hidden = !on;
+      hint.textContent = on
+        ? "Drag on the photo to draw a new box."
+        : "Tap a box to select. Drag to move, corners to resize. Confirm labels that are correct.";
+    }
+
+    async function onFile(file) {
+      if (!file) return;
+      imageFile = file;
+      if (imageUrl) URL.revokeObjectURL(imageUrl);
+      imageUrl = URL.createObjectURL(file);
+      boxes = [];
+      selectedId = null;
+      idSeq = 1;
+      clearStatus();
+      payloadDetails.hidden = true;
+
+      const gps = await readExifGps(file);
+      imageMeta.location = gps;
+      if (gps) {
+        locationEl.textContent = gps.lat.toFixed(6) + ", " + gps.lng.toFixed(6) + " (from image EXIF)";
+      } else {
+        locationEl.textContent = "Location not attached";
+      }
+
+      const img = new Image();
+      img.alt = "Debris photo";
+      img.src = imageUrl;
+      img.onload = () => {
+        imageMeta.width = img.naturalWidth;
+        imageMeta.height = img.naturalHeight;
+        frame.className = "frame";
+        frame.innerHTML = "";
+        frame.appendChild(img);
+        const overlay = document.createElement("div");
+        overlay.className = "overlay";
+        overlay.addEventListener("pointerdown", onOverlayDown);
+        frame.appendChild(overlay);
+        boxes = mockDetections();
+        addBoxBtn.disabled = false;
+        setDrawMode(false);
+        render();
+      };
+    }
+
+    addBoxBtn.addEventListener("click", () => setDrawMode(true));
+    cancelDrawBtn.addEventListener("click", () => setDrawMode(false));
+    cameraInput.addEventListener("change", (e) => {
+      onFile(e.target.files[0]);
+      e.target.value = "";
+    });
+    uploadInput.addEventListener("change", (e) => {
+      onFile(e.target.files[0]);
+      e.target.value = "";
+    });
+    document.addEventListener("pointermove", onPointerMove, { passive: false });
+    document.addEventListener("pointerup", onPointerUp);
+    document.addEventListener("pointercancel", onPointerUp);
+
+    document.addEventListener("keydown", (e) => {
+      if ((e.key === "Backspace" || e.key === "Delete") && selectedId && !e.target.matches("input, select, textarea")) {
+        e.preventDefault();
+        deleteBox(selectedId);
+      }
+    });
+
+    resubmitBtn.addEventListener("click", async () => {
+      const confirmed = boxes.filter((b) => b.confirmed).map((b) => ({
+        id: b.id,
+        label: b.label,
+        originalLabel: b.originalLabel,
+        source: b.source,
+        confidence: b.confidence,
+        confirmed: true,
+        bboxNormalized: { x: round4(b.x), y: round4(b.y), w: round4(b.w), h: round4(b.h) },
+        bboxPixels: {
+          xmin: Math.round(b.x * imageMeta.width),
+          ymin: Math.round(b.y * imageMeta.height),
+          xmax: Math.round((b.x + b.w) * imageMeta.width),
+          ymax: Math.round((b.y + b.h) * imageMeta.height)
+        }
+      }));
+      const payload = {
+        image: {
+          filename: imageFile.name,
+          mimeType: imageFile.type,
+          sizeBytes: imageFile.size,
+          width: imageMeta.width,
+          height: imageMeta.height,
+          lastModified: imageFile.lastModified,
+          location: imageMeta.location
+        },
+        annotations: confirmed
+      };
+      payloadPre.textContent = JSON.stringify(payload, null, 2);
+      payloadDetails.hidden = false;
+      resubmitBtn.disabled = true;
+      try {
+        const res = await fetch("/api/annotations", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) {
+          setStatus(
+            "bad",
+            "Resubmit failed (" + res.status + " " + (res.statusText || "").trim() + "). Mock /api/annotations is not implemented yet. Confirmed labels were not saved."
+          );
+          return;
+        }
+        setStatus("ok", "Resubmit succeeded. " + confirmed.length + " confirmed annotation(s) saved.");
+      } catch (err) {
+        setStatus(
+          "bad",
+          "Resubmit failed: " + err.message + ". Mock /api/annotations is not implemented yet. Confirmed labels were not saved."
+        );
+      } finally {
+        updateCount();
+      }
+    });
+
+    function round4(n) {
+      return Math.round(n * 10000) / 10000;
+    }
+
+    async function readExifGps(file) {
+      const name = (file.name || "").toLowerCase();
+      const jpeg = /jpe?g$/.test(name) || file.type === "image/jpeg";
+      if (!jpeg) return null;
+      const buf = await file.slice(0, 256 * 1024).arrayBuffer();
+      try {
+        return parseJpegGps(new DataView(buf));
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function parseJpegGps(view) {
+      if (view.byteLength < 4 || view.getUint16(0) !== 0xFFD8) return null;
+      let offset = 2;
+      while (offset + 4 <= view.byteLength) {
+        if (view.getUint8(offset) !== 0xFF) break;
+        const marker = view.getUint8(offset + 1);
+        if (marker === 0xDA || marker === 0xD9) break;
+        if (marker === 0x00 || marker === 0xFF) { offset += 1; continue; }
+        const size = view.getUint16(offset + 2);
+        if (size < 2) break;
+        if (marker === 0xE1) {
+          const start = offset + 4;
+          if (start + 6 <= view.byteLength && ascii(view, start, 4) === "Exif" && view.getUint16(start + 4) === 0) {
+            const gps = parseTiffGps(view, start + 6);
+            if (gps) return gps;
+          }
+        }
+        offset += 2 + size;
+      }
+      return null;
+    }
+
+    function ascii(view, start, len) {
+      let s = "";
+      for (let i = 0; i < len && start + i < view.byteLength; i++) s += String.fromCharCode(view.getUint8(start + i));
+      return s;
+    }
+
+    function parseTiffGps(view, tiffStart) {
+      const endian = view.getUint16(tiffStart);
+      const le = endian === 0x4949;
+      if (!le && endian !== 0x4D4D) return null;
+      const u16 = (o) => view.getUint16(o, le);
+      const u32 = (o) => view.getUint32(o, le);
+      if (u16(tiffStart + 2) !== 42) return null;
+      const ifd0 = tiffStart + u32(tiffStart + 4);
+      const gpsPtr = findTagValue(view, tiffStart, ifd0, 0x8825, le);
+      if (gpsPtr == null) return null;
+      const gpsIfd = tiffStart + gpsPtr;
+      const latRef = findAsciiTag(view, tiffStart, gpsIfd, 0x0001, le);
+      const lonRef = findAsciiTag(view, tiffStart, gpsIfd, 0x0003, le);
+      const lat = readRational3(view, tiffStart, gpsIfd, 0x0002, le);
+      const lon = readRational3(view, tiffStart, gpsIfd, 0x0004, le);
+      if (lat == null || lon == null) return null;
+      let latDeg = lat[0] + lat[1] / 60 + lat[2] / 3600;
+      let lonDeg = lon[0] + lon[1] / 60 + lon[2] / 3600;
+      if (latRef === "S") latDeg = -latDeg;
+      if (lonRef === "W") lonDeg = -lonDeg;
+      if (!isFinite(latDeg) || !isFinite(lonDeg)) return null;
+      return { lat: latDeg, lng: lonDeg };
+    }
+
+    function findTag(view, tiffStart, ifd, tag, le) {
+      if (ifd + 2 > view.byteLength) return null;
+      const u16 = (o) => view.getUint16(o, le);
+      const u32 = (o) => view.getUint32(o, le);
+      const count = u16(ifd);
+      for (let i = 0; i < count; i++) {
+        const entry = ifd + 2 + i * 12;
+        if (entry + 12 > view.byteLength) return null;
+        if (u16(entry) === tag) {
+          return {
+            type: u16(entry + 2),
+            count: u32(entry + 4),
+            value: u32(entry + 8),
+            entry: entry
+          };
+        }
+      }
+      return null;
+    }
+
+    function findTagValue(view, tiffStart, ifd, tag, le) {
+      const found = findTag(view, tiffStart, ifd, tag, le);
+      return found ? found.value : null;
+    }
+
+    function findAsciiTag(view, tiffStart, ifd, tag, le) {
+      const found = findTag(view, tiffStart, ifd, tag, le);
+      if (!found) return null;
+      if (found.count <= 4) {
+        return String.fromCharCode(view.getUint8(found.entry + 8));
+      }
+      let s = "";
+      const start = tiffStart + found.value;
+      for (let i = 0; i < found.count && start + i < view.byteLength; i++) {
+        const c = view.getUint8(start + i);
+        if (c === 0) break;
+        s += String.fromCharCode(c);
+      }
+      return s;
+    }
+
+    function readRational3(view, tiffStart, ifd, tag, le) {
+      const found = findTag(view, tiffStart, ifd, tag, le);
+      if (!found || found.count < 3) return null;
+      const start = tiffStart + found.value;
+      const vals = [];
+      for (let i = 0; i < 3; i++) {
+        const o = start + i * 8;
+        if (o + 8 > view.byteLength) return null;
+        const num = view.getUint32(o, le);
+        const den = view.getUint32(o + 4, le) || 1;
+        vals.push(num / den);
+      }
+      return vals;
+    }
+  </script>
+</body>
+</html>
