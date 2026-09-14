@@ -10,14 +10,17 @@ Debris classes in the current PoC: fallen tree, damaged building, rubble pile, d
 
 ## Current state
 
-- Vanilla `index.html` PoC only. No build step, no framework, no backend.
+- Vanilla `index.html` PoC only. No build step, no framework, no real backend.
 - YOLO detections are **mocked** in the page when an image loads. There is no real model.
-- Resubmit `POST`s JSON to `/api/annotations`. That endpoint does not exist; a 4xx/5xx or network error is expected. The UI must still show a clear success or failure state.
+- Resubmit `POST`s JSON to `/api/annotations`. On Vercel, `api/annotations.js` is a **mock** that returns 200 and does not store anything. Local static servers will still 4xx/5xx; the UI must show success or failure either way.
 - Geospatial is a **hard requirement** but is still being scoped with the user. Do not build a map product. The PoC only reads JPEG EXIF GPS when present and otherwise shows “location not attached”.
+- Phone testing needs HTTPS (camera capture). Deploy with Vercel (`vercel.json` marks this as a static “Other” project).
 
 ## Layout
 
 - `index.html` — entire UI (markup, CSS, JS).
+- `api/annotations.js` — mock POST handler (no database).
+- `vercel.json` — static deploy config (no framework, no build).
 - `AGENTS.md` — this file.
 
 Keep new work in the repo root unless asked to split files. Prefer editing `index.html` over adding a bundler or `src/` tree.
@@ -39,7 +42,7 @@ Keep new work in the repo root unless asked to split files. Prefer editing `inde
 ## What not to overbuild
 
 - No real YOLO, ONNX, Python training loop, dataset exporter, or model registry.
-- No real `/api/annotations` server, database, or auth unless asked.
+- No real `/api/annotations` persistence, database, or auth unless asked. The Vercel function is a mock ack only.
 - No map SDK, tile layer, or GIS stack. Keep GPS as a placeholder (EXIF lat/lng or a not-attached note).
 - No extra docs, design system, or sample image assets unless needed for the task.
 - Do not invent extra debris classes, user accounts, or multi-photo queues without being asked.
@@ -47,3 +50,5 @@ Keep new work in the repo root unless asked to split files. Prefer editing `inde
 ## How to run
 
 Serve the repo root with any static server (needed so `fetch('/api/annotations')` is same-origin). Opening the file via `file://` is not the intended path.
+
+For a phone test, deploy to Vercel so the page is HTTPS (required for camera capture). Production deploys are easier to open on a phone than SSO-protected previews.
