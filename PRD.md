@@ -1,14 +1,14 @@
-# PRD outline — Neighborhood storm debris tagging
+# PRD outline — Debris Mapper
 
-Status: draft outline  
-Product working name: TBD  
+Status: draft outline (decisions filled 2026-09-29)  
+Product working name: **Debris Mapper**  
 Related PoC: `index.html` human-in-the-loop debris labeling
 
 ---
 
 ## 1. One-liner
 
-A lightweight phone app where neighbors photograph and tag storm debris — turning “it just sits in the camera roll” into a small, shared act of noticing after bad weather.
+**Debris Mapper** is a lightweight phone app where neighbors photograph and tag storm debris — turning “it just sits in the camera roll” into a shared, place-aware map of what’s out there after bad weather.
 
 ## 2. Inspiration & tone
 
@@ -23,57 +23,73 @@ After a storm, neighbors already document debris with their phones. That effort 
 
 1. Photos stay private in camera rolls.
 2. There’s no easy way to label *what* is in the photo.
-3. There’s no lightweight shared picture of “what’s out there on our block.”
+3. There’s no shared, place-aware picture of “what’s out there on our block.”
 
 Separately, better debris detection models need real human-confirmed labels — but collection has to feel worth doing for ordinary people, not only for ML engineers.
 
-## 4. Goals
+## 4. What v1 is
 
-### Product goals
-- Make “snap → tag → share/send” take under a minute on a phone.
-- Give neighbors a sense that their photos *go somewhere useful* (community awareness and/or model improvement — TBD which is primary for v1).
-- Keep the experience emotionally light enough that people actually open the app after a storm.
+**v1 is a technical exploration**, not a polished consumer launch.
 
-### Learning goals (PoC → product)
+Prove a thin end-to-end featureset:
+
+1. **YOLO detections** on a storm debris photo (real model path; mock is only a stand-in until then).
+2. **Human adjustment** — edit labels, move/resize/add/delete boxes; only **confirmed** boxes count.
+3. **Upload / persist** the photo + confirmed annotations + **mandatory location**.
+4. **Map** — anyone can see submitted debris reports as equal neighbor pins/markers (no privileged roles).
+
+### Stretch goal (post-v1 exploration)
+- **AR revisit loop:** navigate people to a reported spot, confirm whether debris is still there / gone, and optionally take a new photo to update the report.
+
+## 5. Goals
+
+### Exploration goals (v1)
+- Prove YOLO → correct-in-UI → upload → visible-on-map works on a phone.
 - Validate that neighbors will confirm/correct debris labels in the field.
 - Learn which classes people can tag confidently.
-- Decide how much geospatial context is required vs optional.
+- Prove **mandatory location** capture (EXIF and/or device GPS) is reliable enough for map pins.
 
-## 5. Non-goals (for now)
+### Product goals (tone / adoption, even in exploration)
+- Keep “snap → tag → upload” fast on a phone.
+- Make the map the payoff: your photo left the camera roll and showed up for everyone.
+- Keep the experience light enough that people actually open Debris Mapper after a storm.
 
-- Full GIS / map product, tile layers, routing.
+## 6. Non-goals (for now)
+
 - Official emergency-management tooling or 911 integration.
-- User accounts, social feed, comments, or neighborhood chat (unless later required).
-- Real-time multiplayer labeling queues.
-- Polished design system / brand campaign before the core loop works.
-- Large-scale YOLO training pipeline before we can store confirmed labels.
+- User accounts, roles, moderation queues, or “organizer vs resident” privilege tiers (v1: all neighbors equal).
+- Social feed, comments, or neighborhood chat.
+- Full GIS stack / routing / parcel data (map is for seeing reports, not a planning system).
+- Large training platform / model registry before the upload→map loop is real.
+- Shipping the AR revisit experience in v1 (stretch only).
 
-## 6. Users
+## 7. Users & visibility
 
-### Primary
-- **Neighbors / residents** after a storm: walk the block, take a photo, tag what they see, move on.
+### Who uses it
+- **Neighbors / residents** after a storm: walk the block, take a photo, tag what they see, upload, see it on the map.
 
-### Secondary (later)
-- Local mutual-aid / HOA / block organizers who want a simple picture of reported debris.
-- Model trainers who use confirmed tags as ground truth.
+### Who can see reports
+- **Everyone.** All neighbors are equal — no private submissions, no organizer-only layer in v1.
+- Assume public (or broadly shared) photo + location + labels. Privacy copy should say so clearly before upload.
 
 Assume: one hand, outdoor light, spotty connectivity, emotional fatigue after severe weather. UI must be thumb-friendly and forgiving.
 
-## 7. Core experience loop
+## 8. Core experience loop
 
-1. Open app (HTTPS on phone).
+1. Open Debris Mapper (HTTPS on phone).
 2. Take photo (preferred) or upload from camera roll.
-3. See suggested debris boxes (mock YOLO today → real model later).
-4. Confirm, fix, add, or delete tags — **only confirmed tags count**.
-5. Optionally attach / show location (EXIF when present; otherwise “location not attached”).
-6. Submit. Get a clear success moment that feels like a small win, not a form receipt.
-7. Done — back to walking the block.
+3. Attach **location** (required — block submit if missing; prefer EXIF, fall back to device GPS).
+4. See suggested debris boxes (YOLO; mock only until real model is wired).
+5. Confirm, fix, add, or delete tags — **only confirmed tags count**.
+6. Upload. Get a clear success moment that feels like a small win.
+7. Land on / open the **map** and see the report with everyone else’s.
+8. Done — back to walking the block.
 
-The emotional beat after submit should reinforce usefulness and lightness (“tagged,” “sent,” “counted”) rather than clinical ML language.
+The emotional beat after upload should reinforce usefulness and lightness (“it’s on the map”) rather than clinical ML language.
 
-## 8. Debris classes (starting set)
+## 9. Debris classes (starting set)
 
-Keep the current PoC set until phone testing says otherwise:
+Keep the current PoC set until field testing says otherwise:
 
 | Class | Notes |
 |---|---|
@@ -84,102 +100,123 @@ Keep the current PoC set until phone testing says otherwise:
 
 Open: merge/split classes? Add flooded street, debris on road, etc.?
 
-## 9. Product principles
+## 10. Product principles
 
-1. **Neighbor first, model second.** Training data is a byproduct of a useful human moment.
-2. **Confirmed only.** Unconfirmed suggestions are never ground truth.
+1. **Exploration over ceremony.** v1 proves the loop; polish follows evidence.
+2. **Confirmed only.** Unconfirmed YOLO suggestions are never ground truth.
 3. **Joy without denial.** Light tone; still honest that storms suck.
 4. **Phone-native.** Camera, big taps, short copy, works in sunlight.
-5. **Geo is required eventually, not a map product yet.** Capture lat/lng when we can; don’t block tagging if EXIF is missing (decision TBD).
-6. **Don’t overbuild.** Vanilla, fast, shippable slices beat architecture theater.
+5. **Location is mandatory.** No map pin, no upload.
+6. **Equal neighbors.** Same submit rights, same visibility — no special roles in v1.
+7. **Don’t overbuild.** Prefer the smallest stack that proves YOLO + edit + upload + map.
 
-## 10. Functional requirements (outline)
+## 11. Functional requirements (outline)
 
-### Must have (v1)
-- [ ] Camera capture + upload
+### Must have (v1 exploration)
+- [ ] Camera capture + upload from camera roll
+- [ ] YOLO suggestions on the photo (real model path; mock acceptable only as interim)
 - [ ] Bounding-box review: confirm / edit label / move / resize / delete / add
 - [ ] Clear confirmed vs suggestion state
-- [ ] Submit with success / failure feedback
-- [ ] Persist confirmed annotations somewhere real (beyond mock ack)
-- [ ] Location: EXIF GPS when available; honest empty state when not
+- [ ] **Mandatory location** before submit (EXIF GPS and/or device geolocation)
+- [ ] Persist photo + confirmed annotations + location
+- [ ] **Map view** of all reports (everyone equal)
+- [ ] Submit success / failure feedback
 - [ ] Mobile-first layout; works on personal phone over HTTPS
 
-### Nice to have
-- [ ] Lightweight “you tagged N things” personal streak / neighborhood total (joy metric, not gamification treadmill)
-- [ ] Before/after or “walk complete” moment
+### Nice to have (still v1 if cheap)
+- [ ] Tap map pin → see photo + labels
+- [ ] Lightweight “N reports on the map” moment after upload
 - [ ] Offline queue + sync when back online
-- [ ] Simple public or shared neighborhood summary (privacy TBD)
+- [ ] Safety copy near downed-power-line class
 
-### Explicitly later
-- [ ] Real YOLO / ONNX inference in the loop
-- [ ] Training export + model registry
-- [ ] Auth / multi-neighborhood tenancy
-- [ ] Map view of reports
+### Stretch (explicitly not v1)
+- [ ] AR navigation to an existing report
+- [ ] On-site confirm: still there / cleared
+- [ ] Follow-up photo that updates or closes the report
 
-## 11. Geospatial (hard requirement, still scoped)
+## 12. Geospatial
 
-**Need:** debris reports should be place-aware enough to be useful locally.  
-**Not building yet:** interactive map product.
+**Decision:** location is **mandatory** for every upload.  
+**Decision:** reports are visible to **all neighbors equally** on a shared map.
 
-### Open decisions
-- Is location required to submit, or optional with a nudge?
-- Is EXIF enough for v1, or do we need a one-tap “use my current location”?
-- Who can see lat/lng — only the submitter, organizers, or a public pin (blurred)?
+### Implementation notes (outline)
+- Prefer JPEG EXIF GPS when present.
+- If EXIF missing, require device geolocation (with a clear permission prompt).
+- If neither available → cannot submit (explain why, offer retry).
+- Map shows pins/markers for reports; precision/blurring TBD but default is honest lat/lng for exploration unless field testing demands fuzzing.
 
-## 12. Success metrics
+### Still open (implementation detail, not product direction)
+- Exact map library / provider.
+- Pin clustering, filters by class, time window.
+- Whether photos are full-res public or thumbnail + lightbox.
 
-### Experience
-- Time from open → successful submit (target: &lt; 60s for a simple photo).
-- % of sessions that confirm ≥1 box.
-- Qualitative: “Would you open this again after the next storm?”
+## 13. Success metrics
+
+### Exploration (primary for v1)
+- End-to-end path works on phone: detect → adjust → upload with location → appears on map.
+- % of attempted submits blocked only for “good” reasons (no location / no confirmed boxes).
+- Time from open → successful upload for a simple photo (target: &lt; 60s).
 
 ### Data quality
 - Confirmed boxes per photo.
-- Correction rate vs model suggestions (once real model exists).
+- Correction rate vs YOLO suggestions.
 - Class confusion (which labels get changed most).
 
 ### Joy / levity (soft)
-- People share the app or talk about tagging as something they *wanted* to do.
+- People understand “it’s on the map for everyone” and still choose to upload.
 - Copy/UI feedback that lands as warm, not corny (validate in phone tests).
 
-## 13. Risks & constraints
+## 14. Risks & constraints
 
 - **Tone risk:** too cute after real damage → feels tone-deaf; too serious → nobody opens it.
-- **Safety:** downed power lines / unstable structures — app must never encourage unsafe approach.
-- **Privacy:** house damage photos + GPS are sensitive.
-- **Connectivity:** post-storm networks are bad; design for flaky submit.
-- **Cold start:** mock detections today; without persistence, neighbor effort is discarded.
+- **Safety:** downed power lines / unstable structures — never encourage unsafe approach (especially later AR “walk to pin”).
+- **Privacy:** v1 is public-by-default (photo + location). Must be explicit in UI; may limit willingness to photograph damaged homes.
+- **Connectivity:** post-storm networks are bad; design for flaky upload.
+- **Mandatory GPS:** indoor/camera-roll photos without EXIF will force device location (which may not match where the debris was).
+- **Cold start:** without real persistence + map, neighbor effort is discarded.
 
-## 14. Phased roadmap (suggested)
+## 15. Phased roadmap (suggested)
 
-### Phase 0 — PoC (mostly done)
-- Mock YOLO labeling UI, EXIF GPS placeholder, Vercel phone HTTPS path.
+### Phase 0 — Labeling PoC (mostly done)
+- Mock YOLO UI, EXIF read, Vercel HTTPS path for phone testing.
 
-### Phase 1 — Neighbor-ready loop
-- Permanent deploy, phone UX polish, real persistence for confirmed tags, tone pass on copy/UI for levity.
+### Phase 1 — v1 technical exploration
+- Real or stand-in YOLO in the loop.
+- Confirm/adjust boxes; mandatory location; persist uploads.
+- Shared map of all neighbor reports (equal visibility).
+- Tone pass so the exploration still feels like Debris Mapper, not a lab tool.
 
-### Phase 2 — Place & trust
-- Resolve geo rules; optional current-location fallback; privacy defaults; safety copy for power lines.
+### Phase 2 — Hardening from field use
+- GPS fallback quality, pin UX, safety/privacy copy, offline submit, class tweaks.
 
-### Phase 3 — Real detections
-- Export confirmed labels → train small YOLO → replace mocks → measure whether tagging gets faster/easier.
+### Phase 3 — Model improvement loop
+- Export confirmed labels → retrain → better suggestions → less correction time.
 
-### Phase 4 — Shared neighborhood picture
-- Lightweight summary for a block/area (still not a full map product unless PRD expands).
+### Phase 4 — Stretch: AR revisit
+- Navigate to a pin, confirm gone/still there, optional new photo, update map state.
 
-## 15. Open questions
+## 16. Decisions log
 
-1. Working name / brand voice (playful name vs plain descriptive)?
-2. Is v1 primarily **community documentation** or **model-label collection** — or both equally?
-3. Who sees submitted photos — private, block-only, or broader?
-4. Must location be present to count as a “real” report?
-5. Any age / consent / sensitive-content rules for damaged homes?
-6. Do we want a “thank you / tagged” celebration moment after submit, and how big should it be?
+| Topic | Decision |
+|---|---|
+| Working name | **Debris Mapper** (for now) |
+| v1 purpose | Technical exploration proving YOLO + label/position adjust + upload + map |
+| Visibility | All people / all neighbors equal — shared map, no privileged roles |
+| Location | **Mandatory** to submit |
+| AR revisit / clear-confirm | Stretch goal, not v1 |
 
-## 16. Near-term next steps
+## 17. Remaining open questions
 
-1. Fill gaps in this outline (especially §§11, 12, 15).
-2. Phone-test the current PoC; note friction and tone misses.
-3. Decide persistence target for confirmed annotations (minimal store).
-4. Write a short tone guide (3–5 example strings: empty state, confirm, submit success, no GPS, power-line caution).
-5. Only then: UI refinement pass and first real training dataset plan.
+1. Brand voice details under the Debris Mapper name (how playful vs plain)?
+2. Age / consent / sensitive-content rules for damaged homes on a public map?
+3. How hard should we celebrate submit (“it’s on the map”) in v1 exploration UI?
+4. Map pin precision: exact GPS vs slight fuzz for homes?
+5. YOLO hosting for v1: on-device, serverless API, or keep mock until first trained weights exist?
+
+## 18. Near-term next steps
+
+1. Phone-test the current PoC; note friction vs this v1 loop (especially mandatory location + map gap).
+2. Choose minimal persistence + map stack for Phase 1.
+3. Decide YOLO path for exploration (mock → API → on-device).
+4. Short tone guide (empty state, no-location block, confirm, upload success → map, power-line caution).
+5. Spike: upload with lat/lng → pin on a simple shared map.
