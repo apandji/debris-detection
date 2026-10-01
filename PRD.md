@@ -1,14 +1,14 @@
 # PRD outline — Debris Mapper
 
-Status: draft outline (decisions filled 2026-09-29)  
+Status: draft outline (decisions filled 2026-09-29; social + iOS decisions 2026-10-01)  
 Product working name: **Debris Mapper**  
-Related PoC: `index.html` human-in-the-loop debris labeling
+Related: native iOS scaffold in `ios/` (primary); legacy web PoC `index.html`
 
 ---
 
 ## 1. One-liner
 
-**Debris Mapper** is a lightweight phone app where neighbors photograph and tag storm debris — turning “it just sits in the camera roll” into a shared, place-aware map of what’s out there after bad weather.
+**Debris Mapper** is a lightweight iPhone app where neighbors photograph and tag storm debris — turning “it just sits in the camera roll” into a shared, place-aware map of what’s out there after bad weather. It’s social: anyone can open a report, vote on what the model spotted, fix a box, or leave a voice note.
 
 ## 2. Inspiration & tone
 
@@ -34,9 +34,12 @@ Separately, better debris detection models need real human-confirmed labels — 
 Prove a thin end-to-end featureset:
 
 1. **YOLO detections** on a storm debris photo (real model path; mock is only a stand-in until then).
-2. **Human adjustment** — edit labels, move/resize/add/delete boxes; only **confirmed** boxes count.
-3. **Upload / persist** the photo + confirmed annotations + **mandatory location**.
+2. **Community review** — the poster and any neighbor can vote yes/no on each box, fix a label, move/resize a box, or add one. A box counts as **confirmed** at **2 yes votes**.
+3. **Upload / persist** the photo + boxes + votes + **mandatory location**.
 4. **Map** — anyone can see submitted debris reports as equal neighbor pins/markers (no privileged roles).
+5. **Voice notes** — anyone can leave a short (≤30 s) voice note on a report.
+
+Platform: **native iOS (SwiftUI)**, two tabs — Capture and Map. The web PoC is legacy reference.
 
 ### Stretch goal (post-v1 exploration)
 - **AR revisit loop:** navigate people to a reported spot, confirm whether debris is still there / gone, and optionally take a new photo to update the report.
@@ -57,8 +60,8 @@ Prove a thin end-to-end featureset:
 ## 6. Non-goals (for now)
 
 - Official emergency-management tooling or 911 integration.
-- User accounts, roles, moderation queues, or “organizer vs resident” privilege tiers (v1: all neighbors equal).
-- Social feed, comments, or neighborhood chat.
+- User accounts, roles, moderation queues, or “organizer vs resident” privilege tiers (v1: all neighbors equal; identity is an anonymous handle).
+- Text comments, a social feed, profiles, or neighborhood chat. (Social in v1 = votes, box fixes, and voice notes on a report.)
 - Full GIS stack / routing / parcel data (map is for seeing reports, not a planning system).
 - Large training platform / model registry before the upload→map loop is real.
 - Shipping the AR revisit experience in v1 (stretch only).
@@ -68,6 +71,9 @@ Prove a thin end-to-end featureset:
 ### Who uses it
 - **Neighbors / residents** after a storm: walk the block, take a photo, tag what they see, upload, see it on the map.
 
+### Identity
+- **Anonymous.** Each device gets a friendly three-word handle (e.g. `fire-onyx-support`). No sign-up, no profiles.
+
 ### Who can see reports
 - **Everyone.** All neighbors are equal — no private submissions, no organizer-only layer in v1.
 - Assume public (or broadly shared) photo + location + labels. Privacy copy should say so clearly before upload.
@@ -76,13 +82,13 @@ Assume: one hand, outdoor light, spotty connectivity, emotional fatigue after se
 
 ## 8. Core experience loop
 
-1. Open Debris Mapper (HTTPS on phone).
-2. Take photo (preferred) or upload from camera roll.
-3. Attach **location** (required — block submit if missing; prefer EXIF, fall back to device GPS).
-4. See suggested debris boxes (YOLO; mock only until real model is wired).
-5. Confirm, fix, add, or delete tags — **only confirmed tags count**.
-6. Upload. Get a clear success moment that feels like a small win.
-7. Land on / open the **map** and see the report with everyone else’s.
+1. Open Debris Mapper → **Capture** tab (camera).
+2. Take photo (or pick from camera roll).
+3. **Location** attaches automatically (required — device GPS at the shutter; EXIF for library photos).
+4. See suggested debris boxes (YOLO; mock only until the real model is wired).
+5. Vote ✓/✕ on each, fix labels/boxes, or add a box. Rejected suggestions are still posted (with the poster’s no) so neighbors can disagree.
+6. Post. Land on the **Map** tab, zoomed to the new pin.
+7. Neighbors open the pin, vote, fix boxes, and leave voice notes. Two yes votes confirm a box.
 8. Done — back to walking the block.
 
 The emotional beat after upload should reinforce usefulness and lightness (“it’s on the map”) rather than clinical ML language.
@@ -113,21 +119,23 @@ Open: merge/split classes? Add flooded street, debris on road, etc.?
 ## 11. Functional requirements (outline)
 
 ### Must have (v1 exploration)
-- [ ] Camera capture + upload from camera roll
-- [ ] YOLO suggestions on the photo (real model path; mock acceptable only as interim)
-- [ ] Bounding-box review: confirm / edit label / move / resize / delete / add
-- [ ] Clear confirmed vs suggestion state
+- [x] Camera capture + upload from camera roll (iOS scaffold)
+- [ ] YOLO suggestions on the photo (real model path; mock acceptable only as interim — mock in scaffold)
+- [x] Bounding-box review: vote yes/no / edit label / move / resize / add (scaffold)
+- [x] Neighbor fixes keep the original box and its votes (a fix is a new box, never an overwrite)
+- [x] Clear confirmed (≥2 yes) vs suggestion state
+- [x] Voice notes on a report, ≤30 s (scaffold; stored on-device only)
 - [ ] **Mandatory location** before submit (EXIF GPS and/or device geolocation)
-- [ ] Persist photo + confirmed annotations + location
-- [ ] **Map view** of all reports (everyone equal)
-- [ ] Submit success / failure feedback
-- [ ] Mobile-first layout; works on personal phone over HTTPS
+- [ ] Persist photo + boxes + votes + voice notes + location to a **shared** backend (scaffold is on-device only)
+- [x] **Map view** of all reports (everyone equal)
+- [ ] Submit success / failure feedback (needs real backend)
+- [x] Native iPhone app
 
 ### Nice to have (still v1 if cheap)
-- [ ] Tap map pin → see photo + labels
+- [x] Tap map pin → see photo + labels
 - [ ] Lightweight “N reports on the map” moment after upload
 - [ ] Offline queue + sync when back online
-- [ ] Safety copy near downed-power-line class
+- [x] Safety copy near downed-power-line class
 
 ### Stretch (explicitly not v1)
 - [ ] AR navigation to an existing report
@@ -204,14 +212,24 @@ Open: merge/split classes? Add flooded street, debris on road, etc.?
 | Visibility | All people / all neighbors equal — shared map, no privileged roles |
 | Location | **Mandatory** to submit |
 | AR revisit / clear-confirm | Stretch goal, not v1 |
+| Platform | Native iOS (SwiftUI), two tabs: Capture, Map. Web PoC is legacy. |
+| Social | Votes, box fixes/adds, and voice notes on any report. No text comments/feed. |
+| Identity | Anonymous friendly handles (e.g. `fire-onyx-support`). No accounts. |
+| Editing | Anyone can change a label, move/resize a box, or add a box. A fix is a new box; the original stays. |
+| Rejected suggestions | Still posted, carrying the poster’s no vote. |
+| Confirmed label | **2 yes votes** |
+| Voice notes | Max **30 seconds** |
+| Voice / tone | Neighborly and a little playful |
+| Backend | Deferred (post-critique). Scaffold stores everything on-device. |
 
 ## 17. Remaining open questions
 
-1. Brand voice details under the Debris Mapper name (how playful vs plain)?
-2. Age / consent / sensitive-content rules for damaged homes on a public map?
-3. How hard should we celebrate submit (“it’s on the map”) in v1 exploration UI?
-4. Map pin precision: exact GPS vs slight fuzz for homes?
-5. YOLO hosting for v1: on-device, serverless API, or keep mock until first trained weights exist?
+1. Age / consent / sensitive-content rules for damaged homes on a public map?
+2. How hard should we celebrate submit (“it’s on the map”) in v1 exploration UI?
+3. Map pin precision: exact GPS vs slight fuzz for homes?
+4. YOLO: on-device Core ML is the direction (offline after storms). Taxonomy and training data under research — see `research/`. Does the class set stay at 4 debris classes or shift toward the SAR-style 5 (incl. people)?
+5. Shared backend choice (CloudKit vs Supabase/Firebase) — after critique.
+6. Moderation for voice notes and photos on a public map.
 
 ## 18. Near-term next steps
 

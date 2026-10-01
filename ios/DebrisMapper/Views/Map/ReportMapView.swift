@@ -57,7 +57,11 @@ struct ReportMapView: View {
 
     private var countText: String {
         let n = store.reports.count
-        return n == 1 ? "1 report" : "\(n) reports"
+        switch n {
+        case 0: return "All clear so far"
+        case 1: return "1 report from neighbors"
+        default: return "\(n) reports from neighbors"
+        }
     }
 }
 

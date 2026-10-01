@@ -12,6 +12,7 @@ struct ReviewView: View {
 
     @State private var detections: [Detection] = []
     @State private var isDetecting = true
+    @State private var isEditing = false
 
     /// Capture-time (or EXIF) location first; live GPS as fallback.
     private var postLocation: CLLocation? { photo.location ?? location.location }
@@ -35,10 +36,11 @@ struct ReviewView: View {
                     if isDetecting {
                         HStack(spacing: 12) {
                             ProgressView()
-                            Text("Looking for debris…").foregroundStyle(.secondary)
+                            Text("Squinting at your photo…").foregroundStyle(.secondary)
                         }
                     } else if detections.isEmpty {
-                        Text("No debris found.").foregroundStyle(.secondary)
+                        Text("Nothing jumped out at us. Spot something? Tap Edit and add a box.")
+                            .foregroundStyle(.secondary)
                     } else {
                         ForEach($detections) { $d in
                             DetectionRow(detection: d) {
@@ -47,11 +49,23 @@ struct ReviewView: View {
                         }
                     }
                 } header: {
-                    Text("Suggestions")
+                    HStack {
+                        Text("What We Spotted")
+                        Spacer()
+                        if !isDetecting {
+                            Button("Edit") { isEditing = true }
+                                .font(.subheadline)
+                                .textCase(nil)
+                        }
+                    }
                 } footer: {
                     if !isDetecting && !detections.isEmpty {
-                        Text("Suggestions are guesses. Confirm what you see; neighbors can weigh in after you post.")
+                        Text("These are our best guesses. Tap ✓ if we got it right, ✕ if not, or Edit to fix a label or box. Neighbors get a say once it's posted.")
                     }
+                }
+
+                if detections.contains(where: { $0.label == .downedPowerLine }) {
+                    PowerLineWarning()
                 }
 
                 Section {
@@ -67,7 +81,7 @@ struct ReviewView: View {
                         Label("Location", systemImage: "location.fill")
                     }
                 } footer: {
-                    Text("Posts are public. Your photo and location appear on the shared map.")
+                    Text("Heads up: posts are public. Neighbors will see this photo, where it was taken, and your handle, \(CurrentUser.name).")
                 }
             }
             .navigationTitle("Review")
@@ -82,10 +96,34 @@ struct ReviewView: View {
                         .disabled(isDetecting || postLocation == nil)
                 }
             }
+            .sheet(isPresented: $isEditing) {
+                BoxEditorView(
+                    image: photo.image,
+                    detections: detections,
+                    canDelete: { _ in true },
+                    onDone: applyDraftEdits
+                )
+            }
             .task {
                 detections = await MockDetector.detect(in: photo.image)
                 isDetecting = false
             }
+        }
+    }
+
+    /// The draft is the poster's alone, so edits apply in place. A box they
+    /// drew or corrected counts as their yes, same as a neighbor's fix.
+    private func applyDraftEdits(_ edited: [Detection]) {
+        let before = Dictionary(uniqueKeysWithValues: detections.map { ($0.id, $0) })
+        detections = edited.map { d in
+            var d = d
+            if let old = before[d.id] {
+                guard old.label != d.label || old.box != d.box else { return d }
+                d.source = .person
+                d.confidence = nil
+            }
+            d.votes[CurrentUser.id] = true
+            return d
         }
     }
 
@@ -96,7 +134,7 @@ struct ReviewView: View {
     }
 }
 
-/// Class icon, name, model confidence, plus trailing controls.
+/// Class icon, name, where the box came from, plus trailing controls.
 struct DetectionRow<Trailing: View>: View {
     let detection: Detection
     @ViewBuilder var trailing: Trailing
@@ -107,8 +145,15 @@ struct DetectionRow<Trailing: View>: View {
                 .foregroundStyle(detection.label.color)
                 .frame(width: 28)
             VStack(alignment: .leading, spacing: 2) {
-                Text(detection.label.title)
-                Text("Suggested · \(Int(detection.confidence * 100))%")
+                HStack(spacing: 4) {
+                    Text(detection.label.title)
+                    if detection.isConfirmed {
+                        Image(systemName: "checkmark.seal.fill")
+                            .foregroundStyle(.green)
+                            .accessibilityLabel("Confirmed")
+                    }
+                }
+                Text(subtitle)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -116,6 +161,28 @@ struct DetectionRow<Trailing: View>: View {
             trailing
         }
         .padding(.vertical, 2)
+    }
+
+    private var subtitle: String {
+        if detection.revisionOf != nil { return "A neighbor's fix" }
+        switch detection.source {
+        case .person: return "Added by hand"
+        case .model: return "Our guess · \(Int((detection.confidence ?? 0) * 100))% sure"
+        }
+    }
+}
+
+/// Safety note whenever a downed power line is in play (PRD §14).
+struct PowerLineWarning: View {
+    var body: some View {
+        Section {
+            Label {
+                Text("Stay at least 35 feet back from downed lines (assume they're live) and call your utility or 911.")
+                    .font(.subheadline)
+            } icon: {
+                Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+            }
+        }
     }
 }
 

@@ -37,18 +37,28 @@ struct BoundingBox: Codable, Hashable {
     var h: Double
 }
 
-/// One suggested detection plus every neighbor's vote on it.
-/// A mock/YOLO suggestion is NOT ground truth. Only human votes count.
+/// One box on a photo plus every neighbor's vote on it.
+/// A model suggestion is NOT ground truth. Only human votes count.
 struct Detection: Identifiable, Codable, Hashable {
+    enum Source: String, Codable { case model, person }
+
+    /// Yes votes needed before a box counts as a confirmed training label.
+    static let confirmThreshold = 2
+
     var id = UUID()
     var label: DebrisClass
-    var confidence: Double
     var box: BoundingBox
-    /// userID → true (confirm) / false (reject)
+    var source: Source = .model
+    /// Model confidence; nil for boxes people drew.
+    var confidence: Double?
+    /// Set when a neighbor corrected another box (label or position). The original stays.
+    var revisionOf: UUID?
+    /// userID → true (yes) / false (no)
     var votes: [String: Bool] = [:]
 
     var confirmCount: Int { votes.values.filter { $0 }.count }
     var rejectCount: Int { votes.values.filter { !$0 }.count }
+    var isConfirmed: Bool { confirmCount >= Self.confirmThreshold }
 
     func vote(of userID: String) -> Bool? { votes[userID] }
 }

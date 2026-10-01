@@ -8,6 +8,7 @@ struct ReportDetailView: View {
     @State private var recorder = VoiceRecorder()
     @State private var player = VoicePlayer()
     @State private var micDenied = false
+    @State private var isEditing = false
 
     var body: some View {
         NavigationStack {
@@ -19,7 +20,7 @@ struct ReportDetailView: View {
         }
         .onDisappear {
             player.stop()
-            if recorder.isRecording { _ = recorder.stop() }
+            recorder.stop()
         }
     }
 
@@ -27,7 +28,7 @@ struct ReportDetailView: View {
         List {
             Section {
                 DetectionPhoto(image: store.image(for: report), detections: report.detections) { d in
-                    if d.confirmCount > d.rejectCount { return .confirmed }
+                    if d.isConfirmed { return .confirmed }
                     if d.rejectCount > d.confirmCount { return .rejected }
                     return .suggested
                 }
@@ -35,7 +36,7 @@ struct ReportDetailView: View {
                 .listRowBackground(Color.clear)
             }
 
-            Section("Is this right?") {
+            Section {
                 ForEach(report.detections) { d in
                     DetectionRow(detection: d) {
                         VStack(alignment: .trailing, spacing: 6) {
@@ -49,6 +50,20 @@ struct ReportDetailView: View {
                         }
                     }
                 }
+            } header: {
+                HStack {
+                    Text("Did We Get It Right?")
+                    Spacer()
+                    Button("Edit Boxes") { isEditing = true }
+                        .font(.subheadline)
+                        .textCase(nil)
+                }
+            } footer: {
+                Text("A box is confirmed once \(Detection.confirmThreshold) neighbors say yes. Wrong label or spot? Edit Boxes to suggest a fix.")
+            }
+
+            if report.detections.contains(where: { $0.label == .downedPowerLine }) {
+                PowerLineWarning()
             }
 
             Section {
@@ -63,13 +78,24 @@ struct ReportDetailView: View {
             } footer: {
                 if micDenied {
                     Text("Microphone access is off. Turn it on in Settings to leave a voice note.")
+                } else {
+                    Text("Up to \(Int(VoiceRecorder.maxDuration)) seconds. Tell neighbors what you saw, or that it's been cleared.")
                 }
             }
+        }
+        .sheet(isPresented: $isEditing) {
+            BoxEditorView(
+                image: store.image(for: report),
+                detections: report.detections,
+                // Existing boxes stay (vote them down instead); only new ones can be removed.
+                canDelete: { d in !report.detections.contains(where: { $0.id == d.id }) },
+                onDone: { applyEdits($0, to: report) }
+            )
         }
         .navigationTitle(report.primaryClass?.title ?? "Report")
         .navigationBarTitleDisplayMode(.inline)
         .safeAreaInset(edge: .top, spacing: 0) {
-            Text("\(report.authorName) · \(report.createdAt.formatted(.relative(presentation: .named)))")
+            Text("\(displayName(report.authorID, report.authorName)) · \(report.createdAt.formatted(.relative(presentation: .named)))")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity)
@@ -81,23 +107,13 @@ struct ReportDetailView: View {
     private func recordButton(_ report: Report) -> some View {
         if recorder.isRecording {
             Button {
-                if let result = recorder.stop() {
-                    store.addVoiceNote(
-                        VoiceNote(
-                            authorID: CurrentUser.id,
-                            authorName: CurrentUser.name,
-                            fileName: result.fileName,
-                            duration: result.duration
-                        ),
-                        to: report.id
-                    )
-                }
+                recorder.stop()
             } label: {
                 HStack {
                     Image(systemName: "stop.circle.fill").foregroundStyle(.red)
                     Text("Stop Recording")
                     Spacer()
-                    Text(Duration.seconds(recorder.elapsed).formatted(.time(pattern: .minuteSecond)))
+                    Text("\(mmss(recorder.elapsed)) / \(mmss(VoiceRecorder.maxDuration))")
                         .monospacedDigit()
                         .foregroundStyle(.secondary)
                 }
@@ -105,12 +121,49 @@ struct ReportDetailView: View {
         } else {
             Button {
                 player.stop()
-                Task { micDenied = !(await recorder.start(in: store.voiceDir)) }
+                Task {
+                    let started = await recorder.start(in: store.voiceDir) { result in
+                        guard let result else { return }
+                        store.addVoiceNote(
+                            VoiceNote(
+                                authorID: CurrentUser.id,
+                                authorName: CurrentUser.name,
+                                fileName: result.fileName,
+                                duration: result.duration
+                            ),
+                            to: report.id
+                        )
+                    }
+                    micDenied = !started
+                }
             } label: {
                 Label("Add Voice Note", systemImage: "mic.fill")
             }
         }
     }
+
+    /// Diff the editor's result against the report: changed boxes become a
+    /// neighbor's fix (the original stays), new boxes are added. Nothing is overwritten.
+    private func applyEdits(_ edited: [Detection], to report: Report) {
+        let originals = Dictionary(uniqueKeysWithValues: report.detections.map { ($0.id, $0) })
+        for d in edited {
+            if let old = originals[d.id] {
+                if old.label != d.label || old.box != d.box {
+                    store.revise(reportID: report.id, detectionID: d.id, label: d.label, box: d.box)
+                }
+            } else {
+                store.addDetection(reportID: report.id, label: d.label, box: d.box)
+            }
+        }
+    }
+}
+
+func mmss(_ t: TimeInterval) -> String {
+    Duration.seconds(t).formatted(.time(pattern: .minuteSecond))
+}
+
+func displayName(_ id: String, _ name: String) -> String {
+    id == CurrentUser.id ? "\(name) (you)" : name
 }
 
 struct VoiceNoteRow: View {
@@ -125,13 +178,13 @@ struct VoiceNoteRow: View {
                     .font(.title2)
                     .symbolRenderingMode(.hierarchical)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(note.authorName).foregroundStyle(.primary)
+                    Text(displayName(note.authorID, note.authorName)).foregroundStyle(.primary)
                     Text(note.createdAt.formatted(.relative(presentation: .named)))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                Text(Duration.seconds(note.duration).formatted(.time(pattern: .minuteSecond)))
+                Text(mmss(note.duration))
                     .font(.callout)
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
