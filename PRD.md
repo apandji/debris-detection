@@ -221,6 +221,7 @@ Open: merge/split classes? Add flooded street, debris on road, etc.?
 | Voice notes | Max **30 seconds** |
 | Voice / tone | Neighborly and a little playful |
 | Backend | Deferred (post-critique). Scaffold stores everything on-device. |
+| Distribution / license | Open source, not on the App Store. Compatible with Ultralytics YOLO (AGPL-3.0) as long as the repo is AGPL-compatible. |
 
 ## 17. Remaining open questions
 
