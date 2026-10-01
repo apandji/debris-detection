@@ -4,12 +4,12 @@ FEMA's own site blocks automated downloads, but many FEMA/NWS photos are mirrore
 which records each file's license, author, and event category.
 
     # 1. Crawl categories → manifest (no images yet). Each photo's "event" is the category it came from.
-    python scripts/commons.py crawl "Category:Tornado damage" --out data/commons/tornado.jsonl
+    python scripts/commons.py crawl "Category:Tornado damage" --out manifests/tornado.jsonl
     # 2. See events and counts, to pick held-out test events.
-    python scripts/commons.py events data/commons/tornado.jsonl
+    python scripts/commons.py events manifests/tornado.jsonl
     # 3. Download (1280px wide) into a source folder, filtered by event.
-    python scripts/commons.py download data/commons/tornado.jsonl fema_tornado_test --events "2013 Moore tornado damage" ...
-    python scripts/commons.py download data/commons/tornado.jsonl fema_pool --exclude-events-of fema_tornado_test
+    python scripts/commons.py download manifests/tornado.jsonl fema_tornado_test --events "2013 Moore tornado damage" ...
+    python scripts/commons.py download manifests/tornado.jsonl fema_pool --exclude-events-of fema_tornado_test
 
 Each source folder gets attribution.csv (title, author, license, page URL), required for CC BY / BY-SA.
 Only licenses without NC/ND are kept. Black-and-white/pre-1990 categories are skipped.

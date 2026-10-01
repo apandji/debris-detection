@@ -41,8 +41,8 @@ sources:
   - id: dfire
     name: D-Fire
     url: https://github.com/gaiasd/DFireDataset
-    kind: manual            # OneDrive links in the repo README; we used the README's Kaggle mirror:
-                            # curl -L -o dfire.zip https://www.kaggle.com/api/v1/datasets/download/sayedgamal99/smoke-fire-detection-yolo
+    kind: manual            # OneDrive links in the repo README; fetch.py uses the README's Kaggle mirror (~3 GB)
+    download_url: https://www.kaggle.com/api/v1/datasets/download/sayedgamal99/smoke-fire-detection-yolo
     license: CC0 1.0 (compilation; LICENSE file read 2026-10-01)
     viewpoint: ground / CCTV
     status: checked

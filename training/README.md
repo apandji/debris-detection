@@ -30,3 +30,19 @@ class mapping, cap, and status. Nothing trains unless a person marked it `checke
 - **Prelabels are drafts.** Grounding DINO output is reviewed box by box before it becomes a source.
 - **Licenses travel with data.** Don't add a source without its license; prefer CC0 / CC BY / public domain. NC or unclear sources stay out of the default training set.
 - **Track missed downed lines** separately (recall at low confidence). It's the safety metric.
+
+## Starting in a fresh session
+
+`data/` is git-ignored, so a new machine or session starts empty. Rebuild it with:
+
+```bash
+cd training && pip install -r requirements.txt
+python scripts/fetch.py            # D-Fire (~3 GB via Kaggle) + every Roboflow source (needs ROBOFLOW_API_KEY)
+# Resume the Commons crawl; it appends to the committed manifest and skips photos already listed:
+python scripts/commons.py crawl "Category:Tornado damage" "Category:Images from FEMA, 2000 Southwest Georgia tornado outbreak" \
+  "Category:Images from FEMA, 2001 College Park, Maryland tornado" "Category:Images from FEMA, 2007 Central Florida tornadoes" \
+  --depth 3 --out manifests/tornado.jsonl
+python scripts/commons.py events manifests/tornado.jsonl
+```
+
+`manifests/*.jsonl` are committed (photo lists + licenses, no images). Commons rate-limits hard; run one crawl at a time.
