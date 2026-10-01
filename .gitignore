@@ -1,2 +1,6 @@
 .vercel
 .DS_Store
+xcuserdata/
+DerivedData/
+*.xcuserstate
+ios/DebrisMapper.xcodeproj/project.xcworkspace/xcuserdata/
