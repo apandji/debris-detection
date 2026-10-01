@@ -41,16 +41,17 @@ sources:
   - id: dfire
     name: D-Fire
     url: https://github.com/gaiasd/DFireDataset
-    kind: manual            # download links (Drive/OneDrive) are in the repo README
-    license: CC0 1.0 (compilation) — re-check LICENSE file
+    kind: manual            # OneDrive links in the repo README; we used the README's Kaggle mirror:
+                            # curl -L -o dfire.zip https://www.kaggle.com/api/v1/datasets/download/sayedgamal99/smoke-fire-detection-yolo
+    license: CC0 1.0 (compilation; LICENSE file read 2026-10-01)
     viewpoint: ground / CCTV
-    status: todo
-    names: [smoke, fire]    # D-Fire label ids 0=smoke 1=fire — verify against README
+    status: checked
+    names: [smoke, fire]    # 0=smoke 1=fire (Kaggle data.yaml); 21,527 images (14,122 train / 3,099 val / 4,306 test)
     class_map: {smoke: fire_smoke, fire: fire_smoke}
     cap: 3000
     negatives: true         # keep some no-fire images as backgrounds
     negative_cap: 1000
-    notes: Unzip to data/raw/dfire/ keeping its train/ and test/ folders (each with images/ and labels/).
+    notes: Unzip to data/raw/dfire/ (data/{train,val,test}/{images,labels}). Eyeballed 2026-10-01 — ground + CCTV, many sunset/fog negatives.
 
   - id: rf_fallen_trees_visual_deformity
     name: Roboflow – Fallen Trees (visual-deformity)
@@ -150,24 +151,25 @@ sources:
   # ---------- Our own labels ----------
   - id: fema_tornado_test
     name: FEMA tornado photos — held-out test set (hand-labeled)
-    url: https://www.fema.gov/multimedia-library
-    kind: manual
+    url: https://commons.wikimedia.org/wiki/Category:Tornado_damage
+    kind: commons           # fema.gov blocks automated downloads; FEMA/NWS photos are mirrored on Commons
     role: test
-    license: US federal work, public domain — check each photo's credit line
+    license: per photo in attribution.csv (PD / CC BY / CC BY-SA only)
     viewpoint: ground
     status: todo
     class_map: {}           # labeled directly with our class names
     notes: >
-      300–500 photos from tornado/windstorm events that NO training source uses.
-      Label by hand in Roboflow/CVAT with our 5 classes. Record event names in events.txt
-      so we can keep events out of training. Never train on this.
+      300–500 photos from tornado events that NO training source uses.
+      `commons.py download ... fema_tornado_test --events ...` records each photo's event in
+      attribution.csv; pool downloads use --exclude-events-of fema_tornado_test.
+      Label by hand in Roboflow/CVAT with our 5 classes. Never train on this.
 
   - id: fema_pool
-    name: FEMA / NWS storm photos — unlabeled pool for pre-labeling
-    url: https://www.fema.gov/multimedia-library
-    kind: manual
+    name: FEMA / NWS / Commons storm photos — unlabeled pool for pre-labeling
+    url: https://commons.wikimedia.org/wiki/Category:Tornado_damage
+    kind: commons
     role: pool
-    license: US federal work, public domain — check credit lines
+    license: per photo in attribution.csv (PD / CC BY / CC BY-SA only)
     viewpoint: ground
     status: todo
     notes: Put images in data/raw/fema_pool/images/, run prelabel.py, review every box, then add the reviewed export as a new train source. Priority — downed lines/poles.

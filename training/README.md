@@ -13,7 +13,7 @@ These go beyond the app's 4 current classes; the app gets updated when the first
 | Step | Command | Where |
 |---|---|---|
 | 0. Setup | `pip install -r requirements.txt` | Colab (GPU) or Mac |
-| 1. Download | `ROBOFLOW_API_KEY=… python scripts/fetch.py` · manual sources: see `fetch.py --list` | anywhere |
+| 1. Download | `ROBOFLOW_API_KEY=… python scripts/fetch.py` · storm photos: `python scripts/commons.py crawl/events/download` · manual: `fetch.py --list` | anywhere |
 | 2. Eyeball | `python scripts/sheet.py` → open `data/sheets/<id>/index.html`, then set `status: checked` | anywhere |
 | 3. Merge | `python scripts/merge.py --check`, fill `class_map`, then `python scripts/merge.py` | anywhere |
 | 4. Train | `python scripts/train.py --test` | GPU (`notebooks/train_colab.ipynb`) |
