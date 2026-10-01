@@ -1,0 +1,183 @@
+# Dataset registry + collection checklist for the Debris Mapper detector.
+#
+# Every source we might train on lives here. Scripts read this file:
+#   fetch.py   downloads `kind: roboflow` sources (needs ROBOFLOW_API_KEY)
+#   sheet.py   builds a contact sheet so a person can eyeball viewpoint/quality
+#   merge.py   remaps classes, dedups, caps, and writes the merged YOLO dataset
+#
+# status: todo → requested → downloaded → checked → (merged automatically when checked)
+#   "checked" means a person looked at the contact sheet: ground-level, storm-relevant, license OK.
+#   merge.py only uses sources with status: checked (or --include-downloaded for a quick test).
+# role: train (default) | test (held-out evaluation; never trained on) | pool (unlabeled, for prelabel.py)
+# class_map: source class name → one of `classes`, or null to drop those boxes.
+#   Unmapped names are reported by `merge.py --check` so we can fill them in.
+# cap: max images taken from this source (random, seeded) so big sets don't swamp small ones.
+# License fields marked "unverified" came from search snippets; confirm on the dataset page.
+
+classes:
+  - fallen_tree          # 0
+  - damaged_building     # 1
+  - rubble_debris        # 2
+  - downed_line_or_pole  # 3
+  - fire_smoke           # 4
+
+# Text prompts for Grounding DINO pre-labeling (prelabel.py). Each prompt → class.
+prompts:
+  fallen tree: fallen_tree
+  uprooted tree: fallen_tree
+  tree fallen on a house: fallen_tree
+  damaged house: damaged_building
+  house with roof torn off: damaged_building
+  collapsed building: damaged_building
+  pile of debris: rubble_debris
+  rubble: rubble_debris
+  downed power line: downed_line_or_pole
+  fallen utility pole: downed_line_or_pole
+  fire: fire_smoke
+  smoke: fire_smoke
+
+sources:
+  # ---------- Ready-made boxes ----------
+  - id: dfire
+    name: D-Fire
+    url: https://github.com/gaiasd/DFireDataset
+    kind: manual            # download links (Drive/OneDrive) are in the repo README
+    license: CC0 1.0 (compilation) — re-check LICENSE file
+    viewpoint: ground / CCTV
+    status: todo
+    names: [smoke, fire]    # D-Fire label ids 0=smoke 1=fire — verify against README
+    class_map: {smoke: fire_smoke, fire: fire_smoke}
+    cap: 3000
+    negatives: true         # keep some no-fire images as backgrounds
+    negative_cap: 1000
+    notes: Unzip to data/raw/dfire/ keeping its train/ and test/ folders (each with images/ and labels/).
+
+  - id: rf_fallen_trees_visual_deformity
+    name: Roboflow – Fallen Trees (visual-deformity)
+    url: https://universe.roboflow.com/visual-deformity/fallen-trees-pka1c
+    kind: roboflow
+    workspace: visual-deformity
+    project: fallen-trees-pka1c
+    license: CC BY 4.0 (unverified)
+    viewpoint: unknown — check
+    status: todo
+    class_map: {}
+    cap: 1500
+
+  - id: rf_fallen_trees_steve_chun
+    name: Roboflow – Fallen Trees (steve-chun)
+    url: https://universe.roboflow.com/steve-chun/fallen-trees-1dfmg
+    kind: roboflow
+    workspace: steve-chun
+    project: fallen-trees-1dfmg
+    license: Public Domain (unverified)
+    viewpoint: unknown — check
+    status: todo
+    class_map: {treefall: fallen_tree, roots: null}
+    cap: 1500
+
+  - id: rf_fallen_trees_palms
+    name: Roboflow – Fallen trees (with palms)
+    url: https://universe.roboflow.com/overflow-thaap/fallen-trees-with-palms
+    kind: roboflow
+    workspace: overflow-thaap
+    project: fallen-trees-with-palms
+    license: CC BY 4.0 (unverified)
+    viewpoint: unknown (likely hurricane, ground) — check
+    status: todo
+    class_map: {}
+    cap: 1500
+
+  - id: rf_fallen_trees_origin
+    name: Roboflow – Fallen_Trees_Origin (~4.8k imgs)
+    url: https://universe.roboflow.com/testws-u4esm/fallen_trees_origin-0tn0t
+    kind: roboflow
+    workspace: testws-u4esm
+    project: fallen_trees_origin-0tn0t
+    license: unknown — check
+    viewpoint: unknown — check (largest tree set)
+    status: todo
+    class_map: {}
+    cap: 2000
+
+  - id: rf_rubble_detection
+    name: Roboflow – Rubble Detection (~437 imgs, earthquake)
+    url: https://universe.roboflow.com/rubble-project/rubble-detection
+    kind: roboflow
+    workspace: rubble-project
+    project: rubble-detection
+    license: unknown — check
+    viewpoint: unknown — check
+    status: todo
+    class_map: {rubble: rubble_debris}
+    cap: 1000
+
+  - id: rf_damaged_building
+    name: Roboflow – Damaged Building
+    url: https://universe.roboflow.com/building-damaged/damaged-building
+    kind: roboflow
+    workspace: building-damaged
+    project: damaged-building
+    license: unknown — check
+    viewpoint: mixed — check, drop aerial
+    status: todo
+    class_map: {}
+    cap: 1000
+
+  - id: rf_disaster_detection
+    name: Roboflow – DISASTER_detection
+    url: https://universe.roboflow.com/asderids/disaster_detection-d9uqt
+    kind: roboflow
+    workspace: asderids
+    project: disaster_detection-d9uqt
+    license: unknown — check
+    viewpoint: mixed — check
+    status: todo
+    class_map: {}
+    cap: 1000
+
+  - id: gdbda
+    name: GDBDA (ground-level building damage, 856 smartphone photos)
+    url: https://www.mdpi.com/2072-4292/14/12/2763
+    kind: manual
+    license: unknown — request from authors
+    viewpoint: ground (smartphone)
+    status: todo            # → requested once we email the authors
+    class_map: {debris: rubble_debris, collapse: damaged_building, spalling: null, crack: null}
+    cap: 1000
+    notes: Earthquake damage (concrete), not tornado (wood/roofs). Best ground-level box set we know of.
+
+  # ---------- Our own labels ----------
+  - id: fema_tornado_test
+    name: FEMA tornado photos — held-out test set (hand-labeled)
+    url: https://www.fema.gov/multimedia-library
+    kind: manual
+    role: test
+    license: US federal work, public domain — check each photo's credit line
+    viewpoint: ground
+    status: todo
+    class_map: {}           # labeled directly with our class names
+    notes: >
+      300–500 photos from tornado/windstorm events that NO training source uses.
+      Label by hand in Roboflow/CVAT with our 5 classes. Record event names in events.txt
+      so we can keep events out of training. Never train on this.
+
+  - id: fema_pool
+    name: FEMA / NWS storm photos — unlabeled pool for pre-labeling
+    url: https://www.fema.gov/multimedia-library
+    kind: manual
+    role: pool
+    license: US federal work, public domain — check credit lines
+    viewpoint: ground
+    status: todo
+    notes: Put images in data/raw/fema_pool/images/, run prelabel.py, review every box, then add the reviewed export as a new train source. Priority — downed lines/poles.
+
+  - id: incidents1m
+    name: Incidents1M (MIT) — classification-only pool
+    url: https://github.com/ethanweber/IncidentsDataset
+    kind: manual
+    role: pool
+    license: labels MIT; images are web URLs, copyright stays with owners (research use)
+    viewpoint: mostly ground
+    status: todo
+    notes: Request access via the form in the repo README. Use only to pick candidate photos (tornado, damaged, collapsed, blocked) for prelabel.py.

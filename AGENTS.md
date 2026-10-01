@@ -52,6 +52,7 @@ ios/
       Components/DetectionOverlay.swift # DetectionPhoto (boxes on image), VoteButtons
       Components/BoxEditorView.swift    # Move/resize/relabel/add boxes (used by Review and Report)
 research/                     # Model + dataset research (not app code)
+training/                     # Dataset registry (sources.yaml) + fetch/merge/train/export scripts. See training/README.md
 index.html, api/, vercel.json # legacy web PoC
 PRD.md
 ```
@@ -94,7 +95,7 @@ No CocoaPods/SPM dependencies. Keep it that way unless asked.
 
 ## What not to overbuild
 
-- No real YOLO / Core ML model, training loop, or dataset export in the app yet. Direction is on-device Core ML (offline after storms); see `research/` for the model brief and dataset research. `MockDetector.detect(in:)` is the swap point.
+- No real YOLO / Core ML model in the app yet. Training tooling lives in `training/` (Python, separate from the app; v0 classes: fallen_tree, damaged_building, rubble_debris, downed_line_or_pole, fire_smoke). Keep `sources.yaml` the single dataset registry; never train on `role: test` or unreviewed prelabels. Direction is on-device Core ML (offline after storms); see `research/` for the model brief and dataset research. `MockDetector.detect(in:)` is the swap point.
 - No backend or auth until the user picks a stack (deferred until after critique). No accounts ever without asking; identity is anonymous handles.
 - No feed, comments-as-text, profiles, notifications, moderation, or multi-photo queues unless asked.
 - No AR revisit (PRD stretch goal).
