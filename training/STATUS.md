@@ -5,7 +5,7 @@ _Model dev agent, 2026-10-02. Branch `model-dev`. Registry: `sources.yaml`. Pipe
 **Bottom line:** we can train a first baseline for 4 of the 5 classes today. `rubble_debris` has no
 labeled data; drafts for it are being made from our own Commons photos and need human review.
 `damaged_building` is thin (549 images). Nothing here has been trained yet; there is no GPU in the
-cloud container, so training (and fast prelabeling) belongs on Colab.
+cloud container, so training and prelabeling move to the local Mac agent (`model-local`).
 
 ## Per-class counts (what `merge.py` would use today)
 
@@ -76,27 +76,61 @@ events (`--exclude-events-of fema_tornado_test`), and `merge.py` dedups training
 
 ## Pool and prelabels (rubble plan)
 
-- **Pool:** 4,602 Commons photos from 139 events (test events excluded), uploaded to
-  `pandji/storm-debris-detection` as split train, tags `commons` + `pool` (batches `commons-pool`
-  and `prelabel-rubble-v0`). Event tags are still to be added in bulk. Not all photos show damage
-  (some are officials at press events, some aerial); reviewers skip those.
-- **Grounding DINO drafts** (`scripts/prelabel.py`, threshold 0.30, all 5 classes): 1648 of 4,602 done on CPU
-  so far (in progress). About 22% of images get a `rubble_debris` draft. Drafts are noisy: many
-  spurious pole/smoke boxes and standing trees tagged as fallen, so expect to delete about half of the boxes.
-- **`prelabel-rubble-v0`:** 100 images with the strongest rubble drafts, spread across 42 events, uploaded
-  as their own batch. Drafts are saved as *predictions* (never added to the dataset); so far only
-  4 of the 100 have boxes attached, because each image needs one MCP call. A `ROBOFLOW_API_KEY`
-  in the environment would allow one bulk upload instead.
+- **Pool:** 4,602 Commons photos from 139 events (test events excluded). List and per-photo
+  licenses are in `manifests/fema_pool_attribution.csv`. All uploaded **unlabeled** to
+  `pandji/storm-debris-detection` as split train, tags `commons` + `pool`: 4,502 in batch
+  `commons-pool`, 100 in batch `prelabel-rubble-v0` (also tagged `prelabel-rubble-v0`).
+  **Per-event tags are not added yet** (tags must be `[A-Za-z0-9_-]`; plan: `event-<slug>`
+  via `images_batch_update_metadata`, ≤1000 per call). Some photos aren't damage (officials at
+  press events, aerials); reviewers skip them.
+- **Grounding DINO drafts** (`scripts/prelabel.py`, IDEA-Research/grounding-dino-tiny,
+  threshold 0.30, all 5 classes): **stopped at 1,568 of 4,602** on CPU (Andrew moved GPU work
+  to a local Mac agent). The drafts done so far are committed as labels-only JSON:
+  `manifests/prelabels/fema_pool_gdino_drafts.jsonl` (one line per image: file name, and for
+  each box the class, prompt, score, and xyxy pixel box). Of those, ~22% have a
+  `rubble_debris` draft. Drafts are noisy (spurious pole/smoke boxes, standing trees as fallen);
+  expect to delete about half of the boxes.
+- **`prelabel-rubble-v0`:** 100 images with the strongest rubble drafts, spread across 42 events
+  (`manifests/prelabels/prelabel-rubble-v0.txt`). Images are uploaded; drafts go on as
+  *predictions* (`annotations_save`, `prediction_routing: unassigned`, never `add_to_dataset`).
+  **Only 4 of 100 have drafts attached**; one MCP call per image was too many permission prompts.
+  The other 96 still need theirs (or a bulk upload with `ROBOFLOW_API_KEY`).
 - Nothing from the pool trains until a person has reviewed it and it's exported as a new source.
 
 ## Proposed next step
 
-**Run a first baseline now, in parallel with labeling.** Train YOLO11n on Colab on what's checked
+**Run a first baseline now, in parallel with labeling.** Train YOLO11n on the local Mac (MPS) on what's checked
 (4 classes, ~8.7k images) and score it on the held-out test set once Andrew labels it. That tells us
 early how badly the scraped/Universe domain transfers to US tornado photos. Meanwhile, review
 `prelabel-rubble-v0` in Roboflow, then the next batches (rubble first, then damaged_building
-and downed lines). Retrain once ~500 reviewed rubble images exist. Prelabeling on Colab's GPU would
-take minutes instead of the ~7 h it takes on this container's CPU.
+and downed lines). Retrain once ~500 reviewed rubble images exist. Prelabeling and training now belong to the local Mac agent (MPS), branch `model-local`.
+
+## Handoff for the local agent (`model-local`, cut from `model-dev`)
+
+**Done:** registry vetted (`sources.yaml`); 7 private forks in `pandji` with raw v1 versions; test set
+(193) and pool (4,602) uploaded to `pandji/storm-debris-detection`; manifests committed; `merge.py`
+dedups Roboflow augmented copies and honors `manifests/excludes/`.
+
+**Half-done:** (1) Grounding DINO drafts: 1,568 / 4,602 pool images; (2) `prelabel-rubble-v0`:
+images uploaded, drafts attached to 4 / 100; (3) per-event tags on the pool not applied.
+
+**Next commands** (from `training/`, with `ROBOFLOW_API_KEY` set in `.env` / the shell):
+
+```bash
+pip install -r requirements.txt -r requirements-prelabel.txt
+python scripts/fetch.py                       # D-Fire + the 7 checked/forked Roboflow sources
+python scripts/commons.py download manifests/tornado.jsonl fema_pool --exclude-events-of fema_tornado_test
+python scripts/commons.py download manifests/tornado.jsonl fema_tornado_test \
+  --events "Images from FEMA, 2007 Central Florida tornadoes" "Images from FEMA, 2000 Southwest Georgia tornado outbreak"
+python scripts/prelabel.py data/raw/fema_pool/images data/prelabeled/fema_pool   # MPS; resumable
+python scripts/merge.py --check && python scripts/merge.py
+python scripts/train.py --epochs 100          # baseline, 4 classes (no rubble yet); --test once test labels exist
+```
+
+Then attach drafts for the remaining 96 `prelabel-rubble-v0` images (list in
+`manifests/prelabels/prelabel-rubble-v0.txt`) as predictions, never adding them to the dataset.
+With an API key the Roboflow SDK can upload image + YOLO label together for the next batches.
+Core ML contract is unchanged: `DebrisDetector.mlpackage`, 640 input, NMS, class order as in `sources.yaml`.
 
 ## Housekeeping notes
 

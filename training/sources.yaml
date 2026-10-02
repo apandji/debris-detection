@@ -249,9 +249,10 @@ sources:
     url: https://commons.wikimedia.org/wiki/Category:Tornado_damage
     kind: commons
     role: pool
-    license: per photo in attribution.csv (PD / CC BY / CC BY-SA only)
-    viewpoint: ground
-    status: todo
+    license: per photo in manifests/fema_pool_attribution.csv (PD 73%, CC BY-SA, CC BY, CC0; no NC/ND)
+    viewpoint: ground (mostly; some aerials and press-event photos)
+    status: downloaded      # 4,602 photos, 139 events; in pandji/storm-debris-detection (split train, tags commons+pool), unlabeled
+    prelabels: manifests/prelabels/fema_pool_gdino_drafts.jsonl   # Grounding DINO drafts, 1,568 of 4,602 (unreviewed)
     notes: Put images in data/raw/fema_pool/images/, run prelabel.py, review every box, then add the reviewed export as a new train source. Priority — downed lines/poles.
 
   - id: incidents1m

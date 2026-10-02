@@ -1,6 +1,6 @@
 """Draft boxes with Grounding DINO for a person to review. Never train on unreviewed output.
 
-    pip install -r requirements-prelabel.txt          # GPU recommended; CPU works (~5–10 s/image)
+    pip install -r requirements-prelabel.txt          # CUDA or Apple Silicon (MPS); CPU works (~5–10 s/image)
     python scripts/prelabel.py data/raw/fema_pool/images data/prelabeled/fema_pool
     python scripts/prelabel.py ... --limit 20         # quick look first
 
@@ -71,7 +71,8 @@ def main() -> None:
     prompts = list(prompt_map)
     text = ". ".join(prompts) + "."
 
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = ("cuda" if torch.cuda.is_available()
+              else "mps" if torch.backends.mps.is_available() else "cpu")
     torch.set_num_threads(os.cpu_count() or 4)
     processor = AutoProcessor.from_pretrained(MODEL_ID)
     model = AutoModelForZeroShotObjectDetection.from_pretrained(MODEL_ID).to(device).eval()
