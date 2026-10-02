@@ -62,6 +62,7 @@ def main() -> None:
     ap.add_argument("--limit", type=int)
     args = ap.parse_args()
 
+    os.environ.setdefault("PYTORCH_ENABLE_MPS_FALLBACK", "1")  # ops MPS lacks run on CPU instead of failing
     import torch
     from PIL import Image
     from transformers import AutoModelForZeroShotObjectDetection, AutoProcessor
@@ -71,7 +72,7 @@ def main() -> None:
     prompts = list(prompt_map)
     text = ". ".join(prompts) + "."
 
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
     torch.set_num_threads(os.cpu_count() or 4)
     processor = AutoProcessor.from_pretrained(MODEL_ID)
     model = AutoModelForZeroShotObjectDetection.from_pretrained(MODEL_ID).to(device).eval()

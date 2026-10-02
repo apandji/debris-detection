@@ -19,6 +19,7 @@ What it does, per source in sources.yaml:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import random
 import shutil
 from collections import Counter, defaultdict
@@ -175,6 +176,8 @@ def main() -> None:
                     seen.add(h)
             split = "test" if role == "test" else ("val" if rng.random() < args.val_frac else "train")
             stem = f"{sid}__{img.stem}"
+            if len(stem.encode()) > 200:  # some web-scraped names hit the 255-byte filename limit
+                stem = f"{stem[:160]}_{hashlib.sha1(stem.encode()).hexdigest()[:10]}"
             dst_img = args.out / "images" / split / f"{stem}{img.suffix.lower()}"
             dst_lbl = args.out / "labels" / split / f"{stem}.txt"
             dst_img.parent.mkdir(parents=True, exist_ok=True)

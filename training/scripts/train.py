@@ -23,6 +23,7 @@ def main() -> None:
     ap.add_argument("--imgsz", type=int, default=640)
     ap.add_argument("--batch", type=int, default=-1, help="-1 = auto")
     ap.add_argument("--name", default="debris")
+    ap.add_argument("--device", default=None, help="mps on Apple Silicon, 0 for the first CUDA GPU; default = Ultralytics auto")
     ap.add_argument("--test", action="store_true")
     args = ap.parse_args()
 
@@ -30,7 +31,7 @@ def main() -> None:
 
     model = YOLO(args.model)
     model.train(
-        data=args.data, epochs=args.epochs, imgsz=args.imgsz, batch=args.batch,
+        data=args.data, epochs=args.epochs, imgsz=args.imgsz, batch=args.batch, device=args.device,
         project=str(TRAINING_DIR / "runs"), name=args.name, exist_ok=False,
         mosaic=1.0, mixup=0.1, close_mosaic=10,
         hsv_h=0.015, hsv_s=0.6, hsv_v=0.5, degrees=5.0, fliplr=0.5,

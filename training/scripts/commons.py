@@ -28,7 +28,7 @@ import urllib.request
 from collections import Counter
 from pathlib import Path
 
-from common import RAW_DIR
+from common import RAW_DIR, TRAINING_DIR
 
 API = "https://commons.wikimedia.org/w/api.php"
 HEADERS = {"User-Agent": "DebrisMapper/0.1 (open-source storm debris detector; https://github.com/apandji/debris-detection)"}
@@ -170,8 +170,15 @@ def download(args) -> None:
     if args.events:
         rows = [r for r in rows if r["event"] in set(args.events)]
     if args.exclude_events_of:
+        # A fresh checkout has no data/raw/<id>/, so fall back to the committed copy. Never run
+        # with an empty exclude set: that would pull held-out test events into the pool.
         attr = RAW_DIR / args.exclude_events_of / "attribution.csv"
+        if not attr.exists():
+            attr = TRAINING_DIR / "manifests" / f"{args.exclude_events_of}_attribution.csv"
         held = {r["event"] for r in csv.DictReader(open(attr))} if attr.exists() else set()
+        if not held:
+            raise SystemExit(f"No events found for --exclude-events-of {args.exclude_events_of}; refusing to download.")
+        print(f"Excluding {len(held)} events of {args.exclude_events_of}: {sorted(held)}")
         rows = [r for r in rows if r["event"] not in held]
     if args.exclude_events:
         rows = [r for r in rows if r["event"] not in set(args.exclude_events)]

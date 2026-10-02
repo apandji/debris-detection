@@ -8,6 +8,8 @@ ios/DebrisMapper.xcodeproj/project.xcworkspace/xcuserdata/
 # training
 training/data/
 training/runs/
+training/.env
+training/.venv*/
 *.pt
 *.mlpackage/
 __pycache__/
