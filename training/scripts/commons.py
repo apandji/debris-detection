@@ -18,10 +18,12 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import html
 import json
 import re
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from collections import Counter
@@ -39,15 +41,49 @@ SKIP = re.compile(r"(?i)\b(scale|diagram|map|radar|satellite|aerial|video|stereo
 def api(**params) -> dict:
     params["format"] = "json"
     req = urllib.request.Request(f"{API}?{urllib.parse.urlencode(params)}", headers=HEADERS)
-    for attempt in range(6):
+    for attempt in range(12):
         try:
             with urllib.request.urlopen(req, timeout=60) as r:
-                time.sleep(0.3)  # be polite to Commons
+                time.sleep(1.0)  # be polite to Commons
                 return json.load(r)
         except Exception as e:
             err = e
-            time.sleep(min(60, 3 * 2 ** attempt))
+            retry = getattr(e, "headers", None) and e.headers.get("Retry-After")
+            time.sleep(min(120, int(retry) if retry and retry.isdigit() else 3 * 2 ** attempt))
     raise RuntimeError(f"Commons API failed ({err}): {params}")
+
+
+def fetch_bytes(url: str, tries: int = 3) -> bytes:
+    """GET with short backoff. Commons 429s some files for minutes; give up on those and let a re-run retry them."""
+    for attempt in range(tries):
+        try:
+            with urllib.request.urlopen(urllib.request.Request(url, headers=HEADERS), timeout=60) as r:
+                return r.read()
+        except urllib.error.HTTPError as e:
+            if e.code not in (429, 500, 502, 503, 504) or attempt == tries - 1:
+                raise
+            wait = min(60, int(e.headers.get("Retry-After") or 0) or 5 * 2 ** attempt)
+        except (urllib.error.URLError, TimeoutError):
+            if attempt == tries - 1:
+                raise
+            wait = min(300, 5 * 2 ** attempt)
+        print(f"  backoff {wait}s ({url.rsplit('/', 1)[-1][:60]})", flush=True)
+        time.sleep(wait)
+
+
+STANDARD_WIDTHS = (500, 960, 1280)  # Wikimedia only serves standard thumbnail sizes; originals are throttled hard
+ORIGINAL = re.compile(r"^(https://upload\.wikimedia\.org/wikipedia/commons)/(\w/\w\w)/([^?/]+)")
+
+
+def standard_thumb(r: dict) -> str:
+    """For photos ≤1280 px wide the API hands back the original file, which Wikimedia rate-limits
+    (HTTP 429, Retry-After 600). Ask for the largest standard thumbnail narrower than the original."""
+    m = ORIGINAL.match(r["thumb_url"])
+    widths = [w for w in STANDARD_WIDTHS if w < (r.get("width") or 0)]
+    if not m or not widths:
+        return r["thumb_url"]
+    base, shard, name = m.groups()
+    return f"{base}/thumb/{shard}/{name}/{widths[-1]}px-{name}"
 
 
 def subcats(cat: str) -> list[str]:
@@ -130,6 +166,14 @@ def events(args) -> None:
         print(f"{n:5d}  {ev}   [{', '.join(f'{l} {c}' for l, c in lic)}]")
 
 
+def file_name(title: str) -> str:
+    """Safe local name. Long titles are cut, so add a hash of the full title to keep them unique."""
+    name = re.sub(r"[^\w.-]+", "_", title.removeprefix("File:"))
+    if len(name) > 150:
+        name = f"{name[:140]}_{hashlib.sha1(title.encode()).hexdigest()[:8]}"
+    return name if name.lower().endswith((".jpg", ".jpeg")) else name + ".jpg"
+
+
 def download(args) -> None:
     rows = load(args.manifest)
     if args.events:
@@ -152,21 +196,18 @@ def download(args) -> None:
             w.writeheader()
         n = 0
         for r in rows:
-            name = re.sub(r"[^\w.-]+", "_", r["title"].removeprefix("File:"))[:150]
-            if not name.lower().endswith((".jpg", ".jpeg")):
-                name += ".jpg"
+            name = file_name(r["title"])
             if name in existing:
                 continue
-            req = urllib.request.Request(r["thumb_url"], headers=HEADERS)
             try:
-                with urllib.request.urlopen(req, timeout=60) as resp:
-                    (dest / name).write_bytes(resp.read())
+                (dest / name).write_bytes(fetch_bytes(standard_thumb(r)))
             except Exception as e:
                 print(f"  skip {r['title']}: {e}")
                 continue
             w.writerow({"file": name, **{k: r.get(k, "") for k in w.fieldnames if k != "file"}})
+            fh.flush()
             n += 1
-            time.sleep(0.1)
+            time.sleep(args.delay)
     print(f"Downloaded {n} photos → {dest}  (attribution: {attr_path})")
 
 
@@ -190,6 +231,7 @@ def main() -> None:
     d.add_argument("--exclude-events", nargs="*")
     d.add_argument("--exclude-events-of", help="skip events already used by this source (keeps test events out)")
     d.add_argument("--limit", type=int)
+    d.add_argument("--delay", type=float, default=1.0, help="seconds between downloads (Commons rate-limits)")
     d.set_defaults(fn=download)
     args = ap.parse_args()
     args.fn(args)

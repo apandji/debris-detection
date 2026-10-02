@@ -25,6 +25,7 @@ def main() -> None:
     ap.add_argument("--only", nargs="*")
     ap.add_argument("-n", type=int, default=48, help="images per sheet")
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--jpg", action="store_true", help="also write one tiled sheet.jpg (6 per row)")
     args = ap.parse_args()
 
     for s in load_registry()["sources"]:
@@ -40,7 +41,7 @@ def main() -> None:
         random.Random(args.seed).shuffle(pairs)
         out = DATA_DIR / "sheets" / s["id"]
         out.mkdir(parents=True, exist_ok=True)
-        cards = []
+        cards, thumbs = [], []
         for i, (img_path, lbl) in enumerate(pairs[: args.n]):
             with Image.open(img_path) as im:
                 im = im.convert("RGB")
@@ -56,6 +57,7 @@ def main() -> None:
                     tags.append(name)
                 thumb = f"{i:03d}.jpg"
                 im.save(out / thumb, quality=80)
+                thumbs.append(im.copy())
             caption = ", ".join(sorted(set(tags))) or "no boxes"
             cards.append(f'<figure><img src="{thumb}" loading="lazy"><figcaption>{html.escape(caption)}'
                          f'<br><small>{html.escape(img_path.name)}</small></figcaption></figure>')
@@ -70,6 +72,13 @@ figcaption{{padding:8px}}small{{color:#8e8e93}}</style>
 → set <code>status: checked</code> in sources.yaml.</p>
 <div class="grid">{''.join(cards)}</div>"""
         (out / "index.html").write_text(page)
+        if args.jpg and thumbs:
+            cell, cols = 240, 6
+            tile = Image.new("RGB", (cols * cell, -(-len(thumbs) // cols) * cell), "white")
+            for k, t in enumerate(thumbs):
+                t.thumbnail((cell - 4, cell - 4))
+                tile.paste(t, ((k % cols) * cell, (k // cols) * cell))
+            tile.save(out / "sheet.jpg", quality=80)
         print(f"{s['id']}: {out / 'index.html'}")
 
 
