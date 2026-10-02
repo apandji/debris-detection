@@ -9,6 +9,8 @@ What it does, per source in sources.yaml:
   2. Skip images whose boxes were all dropped (they may still contain unlabeled objects).
      Keep label-less images as negatives only if `negatives: true` (up to `negative_cap`).
   3. Sample at most `cap` positive images.
+  3b. Keep one image per Roboflow original: exports name augmented copies `<stem>.rf.<hash>.jpg`,
+     and some Universe sets ship 3–5 rotated/noised copies per photo (phash misses those).
   4. Drop near-exact duplicates (perceptual hash). Test sources go first, so a training
      copy of a test photo is the one removed — no leakage.
   5. role: test → test split. Everything else → train/val (random --val-frac).
@@ -42,15 +44,26 @@ def map_class(name: str, class_map: dict, classes: list[str]):
     return MISSING
 
 
+def rf_stem(img: Path) -> str:
+    """Roboflow export name `<original>_jpg.rf.<hash>.jpg` → `<original>` (else the plain stem)."""
+    return img.name.split(".rf.")[0]
+
+
 def collect(source: dict, classes: list[str], rng: random.Random):
     """Returns (kept items, stats). Item = (image, [(cls_idx, cx, cy, w, h)])."""
     root = source_dir(source)
     names = class_names(source, root)
     cmap = source.get("class_map") or {}
     stats = {"unmapped": Counter(), "boxes": Counter(), "images": 0, "negatives": 0,
-             "skipped_all_dropped": 0, "names": names, "missing_labels": 0}
+             "skipped_all_dropped": 0, "names": names, "missing_labels": 0, "aug_copies": 0}
     positives, negatives = [], []
-    for img, lbl in find_pairs(root):
+    pairs, stems = find_pairs(root), set()
+    rng.shuffle(pairs)
+    for img, lbl in pairs:
+        if rf_stem(img) in stems:
+            stats["aug_copies"] += 1
+            continue
+        stems.add(rf_stem(img))
         if lbl is None:
             stats["missing_labels"] += 1
         raw = read_boxes(lbl)
@@ -122,6 +135,8 @@ def main() -> None:
         print(f"\n{s['id']}  ({s.get('role', 'train')})")
         print(f"  source classes: {stats['names'] or '— none found (set names: in sources.yaml)'}")
         print(f"  kept: {stats['images']} images, {stats['negatives']} negatives; boxes {dict(stats['boxes'])}")
+        if stats["aug_copies"]:
+            print(f"  skipped {stats['aug_copies']} augmented copies (same Roboflow original)")
         if stats["unmapped"]:
             print(f"  UNMAPPED (dropped): {dict(stats['unmapped'])}  → add to class_map")
         if stats["skipped_all_dropped"]:

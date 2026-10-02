@@ -40,14 +40,15 @@ SKIP = re.compile(r"(?i)\b(scale|diagram|map|radar|satellite|aerial|video|stereo
 def api(**params) -> dict:
     params["format"] = "json"
     req = urllib.request.Request(f"{API}?{urllib.parse.urlencode(params)}", headers=HEADERS)
-    for attempt in range(6):
+    for attempt in range(12):
         try:
             with urllib.request.urlopen(req, timeout=60) as r:
-                time.sleep(0.3)  # be polite to Commons
+                time.sleep(1.0)  # be polite to Commons
                 return json.load(r)
         except Exception as e:
             err = e
-            time.sleep(min(60, 3 * 2 ** attempt))
+            retry = getattr(e, "headers", None) and e.headers.get("Retry-After")
+            time.sleep(min(120, int(retry) if retry and retry.isdigit() else 3 * 2 ** attempt))
     raise RuntimeError(f"Commons API failed ({err}): {params}")
 
 
