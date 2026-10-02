@@ -58,6 +58,10 @@ sources:
   # usable set is forked PRIVATE into our workspace (`pandji`), given a raw version
   # (auto-orient only, no resize/augmentation), and exported from there. `universe:` is the
   # original project, for attribution. fetch.py downloads `workspace/project/version` as usual.
+  # Andrew 2026-10-02: keep the forks in pandji until the project wraps (~1 week), then clean up.
+  # Licensing (Andrew 2026-10-02): Universe sets are accepted for this open-source research model on
+  # three conditions: never republish the images (git holds manifests only), credit every dataset
+  # (license + URL per source, below), and keep the held-out test set public-domain only.
   - id: rf_fallen_trees_visual_deformity
     name: Roboflow – Fallen Trees (visual-deformity), 335 imgs
     url: https://universe.roboflow.com/visual-deformity/fallen-trees-pka1c
@@ -180,7 +184,7 @@ sources:
       Found via universe_search 2026-10-02. The only ground-level downed-pole boxes we know of.
       Images are pre-augmented (rotations, grain), so near-duplicates exist; a few boxes are
       streetlights or signs. Boxes cover the pole, not the wire.
-    cap: 1500
+    cap: 2000              # scarcest class: take every unique original
 
   - id: rf_house_damage_level
     name: Roboflow – HOUSE DAMAGE LEVEL, 1.2k imgs

@@ -57,7 +57,7 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("images", type=Path)
     ap.add_argument("out", type=Path)
-    ap.add_argument("--box-threshold", type=float, default=0.25)  # 12 prompts in one query dilute scores
+    ap.add_argument("--box-threshold", type=float, default=0.30)  # 12 prompts in one query dilute scores
     ap.add_argument("--text-threshold", type=float, default=0.25)
     ap.add_argument("--limit", type=int)
     args = ap.parse_args()
