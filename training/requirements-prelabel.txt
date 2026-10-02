@@ -1,3 +1,2 @@
 -r requirements.txt
-autodistill
-autodistill-grounding-dino
+transformers>=4.45   # Grounding DINO (IDEA-Research/grounding-dino-tiny) via Hugging Face

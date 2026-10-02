@@ -160,7 +160,7 @@ sources:
     version: 1
     license: CC BY 4.0 (Universe listing) — images look web-scraped
     viewpoint: ground, but mostly earthquake/war/demolition damage to concrete high-rises, not wind damage
-    status: downloaded      # borderline: left for Andrew (see STATUS.md)
+    status: rejected        # Andrew 2026-10-02: wrong domain (earthquake/war high-rises), watermarks are a shortcut
     class_map: {damaged-building: damaged_building, damaged-part: null}
     notes: Found via universe_search 2026-10-02. Many Shutterstock/Alamy watermarked frames.
     cap: 1000
@@ -190,8 +190,9 @@ sources:
     project: house-damage-level-ughkd   # private fork
     version: 1
     license: CC BY 4.0 (Universe listing) — images look web-scraped; a few look AI-generated
-    viewpoint: mostly ground (typhoon/tornado house damage), some drone obliques; contact sheet 2026-10-02
-    status: downloaded      # borderline: a noticeable share looks AI-generated; left for Andrew (see STATUS.md)
+    viewpoint: ground after filtering (typhoon/tornado house damage); contact sheets 2026-10-02
+    status: checked         # Andrew 2026-10-02: include, minus AI-generated-looking and aerial frames
+    exclude: manifests/excludes/rf_house_damage_level.txt   # 388 of 767 damaged-house originals (265 AI-looking, 123 aerial)
     class_map: {TOTALLY DAMAGED: damaged_building, PARTIALLY DAMAGED: damaged_building, UNDAMAGED: null}
     cap: 1000
     notes: Found via universe_search 2026-10-02 while looking for damaged_building sources.

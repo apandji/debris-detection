@@ -11,6 +11,7 @@ What it does, per source in sources.yaml:
   3. Sample at most `cap` positive images.
   3b. Keep one image per Roboflow original: exports name augmented copies `<stem>.rf.<hash>.jpg`,
      and some Universe sets ship 3–5 rotated/noised copies per photo (phash misses those).
+  3c. Skip images listed in manifests/excludes/<id>.txt (hand-vetted: AI-generated, aerial, …).
   4. Drop near-exact duplicates (perceptual hash). Test sources go first, so a training
      copy of a test photo is the one removed — no leakage.
   5. role: test → test split. Everything else → train/val (random --val-frac).
@@ -26,7 +27,7 @@ from pathlib import Path
 import yaml
 from PIL import Image
 
-from common import DATA_DIR, class_names, find_pairs, load_registry, read_boxes, source_dir
+from common import TRAINING_DIR, DATA_DIR, class_names, find_pairs, load_registry, read_boxes, source_dir
 
 try:
     import imagehash
@@ -49,21 +50,33 @@ def rf_stem(img: Path) -> str:
     return img.name.split(".rf.")[0]
 
 
+def excluded_stems(source: dict) -> set[str]:
+    """Stems listed in manifests/excludes/<id>.txt (first tab-separated field; # comments)."""
+    path = TRAINING_DIR / "manifests" / "excludes" / f"{source['id']}.txt"
+    if not path.exists():
+        return set()
+    return {line.split("\t")[0].strip() for line in path.read_text().splitlines()
+            if line.strip() and not line.startswith("#")}
+
+
 def collect(source: dict, classes: list[str], rng: random.Random):
     """Returns (kept items, stats). Item = (image, [(cls_idx, cx, cy, w, h)])."""
     root = source_dir(source)
     names = class_names(source, root)
     cmap = source.get("class_map") or {}
     stats = {"unmapped": Counter(), "boxes": Counter(), "images": 0, "negatives": 0,
-             "skipped_all_dropped": 0, "names": names, "missing_labels": 0, "aug_copies": 0}
+             "skipped_all_dropped": 0, "names": names, "missing_labels": 0, "aug_copies": 0, "excluded": 0}
     positives, negatives = [], []
-    pairs, stems = find_pairs(root), set()
+    pairs, stems, excluded = find_pairs(root), set(), excluded_stems(source)
     rng.shuffle(pairs)
     for img, lbl in pairs:
         if rf_stem(img) in stems:
             stats["aug_copies"] += 1
             continue
         stems.add(rf_stem(img))
+        if rf_stem(img) in excluded:
+            stats["excluded"] += 1
+            continue
         if lbl is None:
             stats["missing_labels"] += 1
         raw = read_boxes(lbl)
@@ -137,6 +150,8 @@ def main() -> None:
         print(f"  kept: {stats['images']} images, {stats['negatives']} negatives; boxes {dict(stats['boxes'])}")
         if stats["aug_copies"]:
             print(f"  skipped {stats['aug_copies']} augmented copies (same Roboflow original)")
+        if stats["excluded"]:
+            print(f"  skipped {stats['excluded']} images on the exclude list")
         if stats["unmapped"]:
             print(f"  UNMAPPED (dropped): {dict(stats['unmapped'])}  → add to class_map")
         if stats["skipped_all_dropped"]:
