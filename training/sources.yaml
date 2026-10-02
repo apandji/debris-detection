@@ -5,7 +5,7 @@
 #   sheet.py   builds a contact sheet so a person can eyeball viewpoint/quality
 #   merge.py   remaps classes, dedups, caps, and writes the merged YOLO dataset
 #
-# status: todo → requested → downloaded → checked → (merged automatically when checked)
+# status: todo → requested → downloaded → checked → (merged automatically when checked); rejected = looked, not usable
 #   "checked" means a person looked at the contact sheet: ground-level, storm-relevant, license OK.
 #   merge.py only uses sources with status: checked (or --include-downloaded for a quick test).
 # role: train (default) | test (held-out evaluation; never trained on) | pool (unlabeled, for prelabel.py)
@@ -53,77 +53,90 @@ sources:
     negative_cap: 1000
     notes: Unzip to data/raw/dfire/ (data/{train,val,test}/{images,labels}). Eyeballed 2026-10-01 — ground + CCTV, many sunset/fog negatives.
 
+  # Roboflow Universe sets. Universe exports can't be downloaded directly (the API key isn't
+  # available in cloud sessions, and the MCP's export links for Universe versions 404), so each
+  # usable set is forked PRIVATE into our workspace (`pandji`), given a raw version
+  # (auto-orient only, no resize/augmentation), and exported from there. `universe:` is the
+  # original project, for attribution. fetch.py downloads `workspace/project/version` as usual.
   - id: rf_fallen_trees_visual_deformity
-    name: Roboflow – Fallen Trees (visual-deformity)
+    name: Roboflow – Fallen Trees (visual-deformity), 335 imgs
     url: https://universe.roboflow.com/visual-deformity/fallen-trees-pka1c
     kind: roboflow
-    workspace: visual-deformity
-    project: fallen-trees-pka1c
-    license: CC BY 4.0 (unverified)
-    viewpoint: unknown — check
-    status: todo
-    class_map: {}
+    workspace: pandji
+    project: fallen-trees-pka1c-w3k7t   # private fork of visual-deformity/fallen-trees-pka1c v6 data
+    version: 1
+    license: CC BY 4.0 (Universe listing, 2026-10-02)
+    viewpoint: ground (phone/news photos of typhoon tree-falls in streets; contact sheet 2026-10-02)
+    status: checked
+    names: ["0"]                        # single unnamed class
+    class_map: {"0": fallen_tree}
     cap: 1500
 
   - id: rf_fallen_trees_steve_chun
-    name: Roboflow – Fallen Trees (steve-chun)
-    url: https://universe.roboflow.com/steve-chun/fallen-trees-1dfmg
+    name: Roboflow – Fallen Trees (steve-chun → now rogue-recon), 6.5k imgs
+    url: https://universe.roboflow.com/rogue-recon/fallen-trees
     kind: roboflow
-    workspace: steve-chun
-    project: fallen-trees-1dfmg
-    license: Public Domain (unverified)
-    viewpoint: unknown — check
-    status: todo
+    workspace: rogue-recon
+    project: fallen-trees
+    license: Public Domain (Universe listing)
+    viewpoint: drone, top-down windthrow (sampled 12 on Universe 2026-10-02)
+    status: rejected
     class_map: {treefall: fallen_tree, roots: null}
     cap: 1500
+    notes: Not forked. Every sample is nadir drone imagery of forest blowdown; wrong viewpoint.
 
   - id: rf_fallen_trees_palms
-    name: Roboflow – Fallen trees (with palms)
+    name: Roboflow – Fallen trees (with palms), 8.7k imgs
     url: https://universe.roboflow.com/overflow-thaap/fallen-trees-with-palms
     kind: roboflow
-    workspace: overflow-thaap
-    project: fallen-trees-with-palms
-    license: CC BY 4.0 (unverified)
-    viewpoint: unknown (likely hurricane, ground) — check
-    status: todo
-    class_map: {}
+    workspace: pandji
+    project: fallen-trees-with-palms-70rke   # private fork
+    version: 1
+    license: CC BY 4.0 (Universe listing) — images look web-scraped (news, Weibo, Alamy watermarks)
+    viewpoint: ground (storm tree-falls in streets/parks; contact sheet 2026-10-02)
+    status: checked
+    notes: Noisier than the other tree sets — pre-augmented (grain, rotation), some collages and loose boxes. Capped.
+    class_map: {fallen_tree: fallen_tree, a: null}
     cap: 1500
 
   - id: rf_fallen_trees_origin
-    name: Roboflow – Fallen_Trees_Origin (~4.8k imgs)
+    name: Roboflow – Fallen_Trees_Origin, 1.8k imgs
     url: https://universe.roboflow.com/testws-u4esm/fallen_trees_origin-0tn0t
     kind: roboflow
-    workspace: testws-u4esm
-    project: fallen_trees_origin-0tn0t
-    license: unknown — check
-    viewpoint: unknown — check (largest tree set)
-    status: todo
-    class_map: {}
+    workspace: pandji
+    project: fallen_trees_origin-0tn0t-hcpdf   # private fork
+    version: 1
+    license: CC BY 4.0 (shown on fork; not on Universe search) — images web-scraped (Shutterstock/Bigstock/news watermarks)
+    viewpoint: ground (storm tree-falls on streets/cars, some forest deadfall; contact sheet 2026-10-02)
+    status: checked
+    class_map: {fallen_tree: fallen_tree, person: null}
     cap: 2000
 
   - id: rf_rubble_detection
-    name: Roboflow – Rubble Detection (~437 imgs, earthquake)
+    name: Roboflow – Rubble Detection (earthquake)
     url: https://universe.roboflow.com/rubble-project/rubble-detection
     kind: roboflow
     workspace: rubble-project
     project: rubble-detection
-    license: unknown — check
-    viewpoint: unknown — check
-    status: todo
-    class_map: {rubble: rubble_debris}
+    license: unknown
+    viewpoint: satellite (sampled 12 on Universe 2026-10-02)
+    status: rejected
+    class_map: {Rubble: rubble_debris}
     cap: 1000
+    notes: Not forked. Turkey 2023 earthquake satellite tiles; wrong viewpoint.
 
   - id: rf_damaged_building
-    name: Roboflow – Damaged Building
+    name: Roboflow – Damaged Building (building-damaged), 43 imgs
     url: https://universe.roboflow.com/building-damaged/damaged-building
     kind: roboflow
     workspace: building-damaged
     project: damaged-building
-    license: unknown — check
-    viewpoint: mixed — check, drop aerial
-    status: todo
+    license: CC BY 4.0 (Universe listing)
+    viewpoint: satellite (sampled on Universe 2026-10-02)
+    status: rejected
     class_map: {}
     cap: 1000
+    notes: Not forked. Satellite tiles, 43 images.
 
   - id: rf_disaster_detection
     name: Roboflow – DISASTER_detection
@@ -131,11 +144,43 @@ sources:
     kind: roboflow
     workspace: asderids
     project: disaster_detection-d9uqt
-    license: unknown — check
-    viewpoint: mixed — check
-    status: todo
+    license: unknown
+    viewpoint: unknown
+    status: rejected
     class_map: {}
     cap: 1000
+    notes: Not forked. Project now has 0 images and no versions (checked 2026-10-02).
+
+  - id: rf_damaged_building_tls
+    name: Roboflow – damaged-building (tls), 428 labeled imgs
+    url: https://universe.roboflow.com/tls-fx17y/damaged-building-jytkn
+    kind: roboflow
+    workspace: pandji
+    project: damaged-building-jytkn-hohdk   # private fork
+    version: 1
+    license: CC BY 4.0 (Universe listing) — images look web-scraped
+    viewpoint: ground, but mostly earthquake/war/demolition damage to concrete high-rises, not wind damage
+    status: downloaded      # borderline: left for Andrew (see STATUS.md)
+    class_map: {damaged-building: damaged_building, damaged-part: null}
+    notes: Found via universe_search 2026-10-02. Many Shutterstock/Alamy watermarked frames.
+    cap: 1000
+
+  - id: rf_utility_pole
+    name: Roboflow – utility pole (Compromised-Pole / Stable), 10k imgs
+    url: https://universe.roboflow.com/dequillaprojects/utility-pole-y8w7k
+    kind: roboflow
+    workspace: pandji
+    project: utility-pole-y8w7k-zfcgm   # private fork
+    version: 1
+    license: CC BY 4.0 (Universe listing) — many frames are Google Street View captures
+    viewpoint: ground (snapped/leaning/fallen poles with wires down, storms and vehicle crashes; contact sheet 2026-10-02)
+    status: checked
+    class_map: {Compromised-Pole: downed_line_or_pole, Stable: null}
+    notes: >
+      Found via universe_search 2026-10-02. The only ground-level downed-pole boxes we know of.
+      Images are pre-augmented (rotations, grain), so near-duplicates exist; a few boxes are
+      streetlights or signs. Boxes cover the pole, not the wire.
+    cap: 1500
 
   - id: gdbda
     name: GDBDA (ground-level building damage, 856 smartphone photos)
@@ -156,7 +201,7 @@ sources:
     role: test
     license: per photo in attribution.csv (PD / CC BY / CC BY-SA only)
     viewpoint: ground
-    status: todo
+    status: downloaded      # 193 photos; in Roboflow (split test, tag heldout-test), awaiting hand labels
     class_map: {}           # labeled directly with our class names
     notes: >
       300–500 photos from tornado events that NO training source uses.
