@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import html
 import json
 import re
@@ -187,7 +188,7 @@ def download(args) -> None:
     dest = RAW_DIR / args.source / "images"
     dest.mkdir(parents=True, exist_ok=True)
     attr_path = RAW_DIR / args.source / "attribution.csv"
-    existing = {r["file"] for r in csv.DictReader(open(attr_path))} if attr_path.exists() else set()
+    existing = {r["file"]: r["title"] for r in csv.DictReader(open(attr_path))} if attr_path.exists() else {}
     with open(attr_path, "a", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=["file", "title", "event", "license", "artist", "credit", "date", "page_url"])
         if not existing:
@@ -197,6 +198,9 @@ def download(args) -> None:
             name = re.sub(r"[^\w.-]+", "_", r["title"].removeprefix("File:"))[:150]
             if not name.lower().endswith((".jpg", ".jpeg")):
                 name += ".jpg"
+            if existing.get(name, r["title"]) != r["title"]:
+                # Long titles that share a 150-char prefix would overwrite each other's file.
+                name = f"{name[:140].removesuffix('.jpg')}_{hashlib.sha1(r['title'].encode()).hexdigest()[:8]}.jpg"
             if name in existing:
                 continue
             try:
@@ -205,6 +209,7 @@ def download(args) -> None:
                 print(f"  skip {r['title']}: {e}")
                 continue
             w.writerow({"file": name, **{k: r.get(k, "") for k in w.fieldnames if k != "file"}})
+            existing[name] = r["title"]
             fh.flush()
             n += 1
             time.sleep(args.delay)
