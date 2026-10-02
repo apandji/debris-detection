@@ -2,6 +2,7 @@ import AVFoundation
 import Observation
 
 /// Records one voice note at a time to an .m4a file, capped at `maxDuration`.
+@MainActor
 @Observable
 final class VoiceRecorder {
     static let maxDuration: TimeInterval = 30
@@ -37,15 +38,20 @@ final class VoiceRecorder {
             fileURL = url
             elapsed = 0
             isRecording = true
+            // Scheduled on the main run loop, so the tick is already on the main actor.
             timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
-                guard let self, let recorder = self.recorder else { return }
-                self.elapsed = min(recorder.currentTime, Self.maxDuration)
-                if recorder.currentTime >= Self.maxDuration { self.stop() }
+                MainActor.assumeIsolated { self?.tick() }
             }
             return true
         } catch {
             return false
         }
+    }
+
+    private func tick() {
+        guard let recorder else { return }
+        elapsed = min(recorder.currentTime, Self.maxDuration)
+        if recorder.currentTime >= Self.maxDuration { stop() }
     }
 
     /// Stops recording and reports the result through `onFinish`.
