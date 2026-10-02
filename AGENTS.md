@@ -2,6 +2,20 @@
 
 Guidance for coding agents working on this repo.
 
+## Team (who owns what)
+
+Three Claude agents work on this repo. Stay in your lane; anything cross-cutting goes to the orchestrator.
+
+| Agent | Runs | Owns | Branch |
+|---|---|---|---|
+| **Orchestrator** | cloud session | `AGENTS.md`, `PRD.md`, planning, reviewing and merging agent branches into `ios-scaffold` | `ios-scaffold` |
+| **iOS dev** | local Mac (`~/Developer/debris-detection`, Xcode) | `ios/` | `ios-dev` |
+| **Model dev** | cloud session (open network, `ROBOFLOW_API_KEY`) | `training/`, `research/` | `model-dev` |
+
+- Branch off `ios-scaffold`, push your own branch, and report to the orchestrator; don't merge into `ios-scaffold` yourself.
+- **The contract between iOS and model** is the Core ML model: file `DebrisDetector.mlpackage`, 640×640 input, NMS baked in, class names in this order: `fallen_tree, damaged_building, rubble_debris, downed_line_or_pole, fire_smoke`. Changing it means telling the orchestrator first.
+- Images and labels live in the Roboflow project **`pandji/storm-debris-detection`** (private). Git holds code, registries, and manifests only, never images.
+
 ## Purpose
 
 **Debris Mapper**: neighbors photograph storm debris, a (mocked) YOLO model suggests what's in the photo, and people confirm or reject those suggestions. Reports are pinned on a shared map. It's social: anyone can open any report, vote on its boxes, fix a label or box, add a box, and leave voice notes. Human-confirmed labels later become training data.
