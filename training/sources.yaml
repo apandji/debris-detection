@@ -160,7 +160,7 @@ sources:
     url: https://universe.roboflow.com/tls-fx17y/damaged-building-jytkn
     kind: roboflow
     workspace: pandji
-    project: damaged-building-jytkn-hohdk   # private fork
+    project: damaged-building-jytkn-hohdk   # private fork, DELETED 2026-10-02 (Roboflow Trash, restorable for 30 days)
     version: 1
     license: CC BY 4.0 (Universe listing) — images look web-scraped
     viewpoint: ground, but mostly earthquake/war/demolition damage to concrete high-rises, not wind damage
