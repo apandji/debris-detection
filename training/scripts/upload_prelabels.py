@@ -23,6 +23,7 @@ import argparse
 import os
 import re
 import sys
+import time
 from collections import Counter, defaultdict
 from pathlib import Path
 from xml.sax.saxutils import escape
@@ -76,6 +77,33 @@ def match_names(local: list[str], remote: dict[str, dict]) -> dict[str, dict]:
     return {n: remote[r] for n, r in out.items() if uses[r] == 1}
 
 
+def with_backoff(fn, *a, **kw):
+    """Roboflow answers bursts with "Too Many Requests"; wait and retry instead of stopping
+    between the annotation save and the tag (a rerun would then skip the image as already annotated)."""
+    for attempt in range(8):
+        try:
+            return fn(*a, **kw)
+        except Exception as e:
+            if "Too Many Requests" not in str(e) or attempt == 7:
+                raise
+            wait = 5 * 2 ** attempt
+            print(f"  rate-limited; waiting {wait}s", flush=True)
+            time.sleep(wait)
+
+
+def is_our_draft(key: str, image_id: str, boxes, classes: list[str]) -> bool:
+    """True if the image's saved annotation is exactly this draft (a run stopped after saving it)."""
+    import requests
+
+    def get():
+        r = requests.get(f"https://api.roboflow.com/{WORKSPACE}/{PROJECT}/images/{image_id}",
+                         params={"api_key": key}, timeout=60)
+        r.raise_for_status()  # a 429 raises "Too Many Requests", which with_backoff retries
+        return r.json()
+    ann = (with_backoff(get).get("image") or {}).get("annotation") or {}
+    return sorted(b["label"] for b in ann.get("boxes", [])) == sorted(classes[b[0]] for b in boxes)
+
+
 def voc_xml(name: str, size: tuple[int, int], boxes, classes: list[str]) -> str:
     W, H = size
     objs = "".join(
@@ -110,8 +138,13 @@ def main() -> None:
     images = {lbl.stem: next((args.prelabeled / "images").glob(lbl.stem + ".*"), None) for lbl, _ in drafted}
     matched = match_names([p.name for p in images.values() if p], remote)
     print(f"{len(remote)} pool images in Roboflow; {len(matched)} of {len(drafted)} drafted images matched by name")
+    # Log lines: "<name>\t<status>". status: sent (ours, not tagged yet), tagged, skipped (someone else's).
+    # Older lines without a status were tagged one by one.
     log = args.prelabeled / "uploaded.txt"
-    done = set(log.read_text().split("\n")) if log.exists() else set()
+    status = {}
+    for line in (log.read_text().splitlines() if log.exists() else []):
+        name, _, st = line.partition("\t")
+        status[name] = st or "tagged"
 
     sent, skipped, missing = 0, 0, []
     with open(log, "a") as fh:
@@ -121,25 +154,38 @@ def main() -> None:
                 missing.append(lbl.stem)
                 continue
             rid = matched[img.name]["id"]
-            if img.name in done or args.dry_run:
+            if img.name in status or args.dry_run:
                 continue
             with Image.open(img) as im:
                 size = im.size
-            r = rfapi.save_annotation(key, PROJECT, f"{lbl.stem}.xml", voc_xml(img.name, size, boxes, classes), rid,
-                                      job_name=args.tag, overwrite=False, add_to_dataset=False)
-            if r.get("warn") == "already annotated":
-                skipped += 1  # someone else's annotation; don't mark it as a draft
-            else:
-                sent += 1
-                rfapi.update_image_metadata(key, WORKSPACE, rid, add_tags=[args.tag])
-            fh.write(img.name + "\n")
+            r = with_backoff(rfapi.save_annotation, key, PROJECT, f"{lbl.stem}.xml",
+                             voc_xml(img.name, size, boxes, classes), rid,
+                             job_name=args.tag, overwrite=False, add_to_dataset=False)
+            st = "sent"
+            if r.get("warn") == "already annotated" and not is_our_draft(key, rid, boxes, classes):
+                st = "skipped"  # someone else's annotation; don't mark it as a draft
+            sent, skipped = sent + (st == "sent"), skipped + (st == "skipped")
+            status[img.name] = st
+            fh.write(f"{img.name}\t{st}\n")
             fh.flush()
+            time.sleep(0.5)
             if (sent + skipped) % 50 == 0:
                 print(f"  {sent + skipped} done", flush=True)
     print(f"uploaded {sent} drafts, {skipped} already annotated (left alone), {len(missing)} not found in Roboflow"
           + (" [dry run]" if args.dry_run else ""))
     if missing:
         print("  not found:", missing[:10])
+
+    # Tag in bulk (one call per 500 images) rather than one call per image.
+    to_tag = [n for n, st in status.items() if st == "sent" and n in matched]
+    if to_tag and not args.dry_run:
+        for i in range(0, len(to_tag), 500):
+            chunk = to_tag[i:i + 500]
+            with_backoff(rfapi.batch_update_image_metadata, key, WORKSPACE,
+                         [{"imageId": matched[n]["id"], "addTags": [args.tag]} for n in chunk])
+        with open(log, "a") as fh:
+            fh.writelines(f"{n}\ttagged\n" for n in to_tag)
+        print(f"tagged {len(to_tag)} images {args.tag} (applied asynchronously by Roboflow)")
 
 
 if __name__ == "__main__":
