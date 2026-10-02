@@ -11,3 +11,7 @@ training/runs/
 *.pt
 *.mlpackage/
 __pycache__/
+
+# secrets
+.env
+*.env
