@@ -118,7 +118,9 @@ def voc_xml(name: str, size: tuple[int, int], boxes, classes: list[str]) -> str:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("prelabeled", type=Path, help="output dir of prelabel.py")
-    ap.add_argument("--require-class", default="rubble_debris", help="only send images with a draft of this class")
+    ap.add_argument("--require-class", default="rubble_debris",
+                    help="only send images with a draft of this class; 'any' = every image with a draft")
+    ap.add_argument("--query", default="tag:pool", help="Roboflow search for the images to match against")
     ap.add_argument("--tag", default="prelabel-rubble-v0")
     ap.add_argument("--limit", type=int)
     ap.add_argument("--dry-run", action="store_true")
@@ -128,16 +130,16 @@ def main() -> None:
     from roboflow.adapters import rfapi
 
     classes = load_registry()["classes"]
-    want = classes.index(args.require_class)
+    want = None if args.require_class == "any" else classes.index(args.require_class)
     labels = sorted((args.prelabeled / "labels").glob("*.txt"))
     drafted = [(lbl, boxes) for lbl, boxes in ((lbl, read_boxes(lbl)) for lbl in labels)
-               if any(b[0] == want for b in boxes)]
+               if boxes and (want is None or any(b[0] == want for b in boxes))]
     print(f"{len(labels)} prelabeled images, {len(drafted)} with a {args.require_class} draft")
 
-    remote = list_images(key, "tag:pool")
+    remote = list_images(key, args.query)
     images = {lbl.stem: next((args.prelabeled / "images").glob(lbl.stem + ".*"), None) for lbl, _ in drafted}
     matched = match_names([p.name for p in images.values() if p], remote)
-    print(f"{len(remote)} pool images in Roboflow; {len(matched)} of {len(drafted)} drafted images matched by name")
+    print(f"{len(remote)} images in Roboflow ({args.query}); {len(matched)} of {len(drafted)} drafted images matched by name")
     # Log lines: "<name>\t<status>". status: sent (ours, not tagged yet), tagged, skipped (someone else's).
     # Older lines without a status were tagged one by one.
     log = args.prelabeled / "uploaded.txt"
