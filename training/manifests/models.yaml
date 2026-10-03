@@ -1,0 +1,37 @@
+# Model versions for the Debris Mapper detector. One entry per model the app may ship.
+#
+# version: v<N>, bumped whenever the training data or classes the model can detect change
+#   (v1 = + rubble, v2 = + better fallen trees, ...). A retrain on the same data with other settings is
+#   v<N>.<k> (v1.1). The version is stamped into DebrisDetector.mlpackage (`export.py --version`), and the
+#   app shows it.
+# The .mlpackage itself is not in git: it lives at training/models/<version>/DebrisDetector.mlpackage on the
+#   machine that exported it; rebuild it from `weights` with export.py.
+# Metrics: val = merged val split (same sources as train, optimistic); test = held-out FEMA tornado set.
+#   recall_line_c10 = downed_line_or_pole recall at confidence 0.10, IoU 0.5 (the safety metric).
+
+models:
+  - version: v0
+    date: 2026-10-03
+    status: current          # current | retired | candidate
+    weights: training/runs/v0/weights/best.pt
+    base: yolo11n.pt (COCO)
+    recipe: 100 epochs, 640 px, batch 16, MPS (scripts/train.py defaults)
+    git: model-local @ 6062151
+    data: [dfire, rf_fallen_trees_visual_deformity, rf_fallen_trees_palms, rf_fallen_trees_origin,
+           rf_utility_pole, rf_house_damage_level, rf_hurricane_earthquake]
+    train_images: 7457
+    detects: [fallen_tree, damaged_building, downed_line_or_pole, fire_smoke]   # rubble_debris: no labels yet
+    metrics:
+      val: {mAP50: 0.709, mAP50_95: 0.404, recall_line_c10: 0.832,
+            per_class_mAP50: {fallen_tree: 0.608, damaged_building: 0.777, downed_line_or_pole: 0.762, fire_smoke: 0.690}}
+      test: pending           # held-out labels in Roboflow job heldout-test-drafts-v0
+    coreml: {size_mb: 2.7, int8: true, agree_with_pytorch: 39/40 val photos}
+    notes: Baseline. Cannot detect rubble. fallen_tree recall is the weakest (0.55 at max-F1).
+
+  # Planned
+  - version: v1
+    status: planned
+    change: + rubble_debris from reviewed prelabel-rubble-v0 drafts (~300 photos)
+  - version: v2
+    status: planned
+    change: better fallen_tree data (relabel loose boxes or add a cleaner source), chosen after the v0/v1 test results
