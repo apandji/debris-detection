@@ -1,15 +1,54 @@
 """Export a trained model to Core ML for the iOS app.
 
-    python scripts/export.py runs/debris/weights/best.pt
+    python scripts/export.py runs/debris/weights/best.pt      # → runs/debris/weights/DebrisDetector.mlpackage
 
-Run on a Mac: Core ML INT8 quantization only works on macOS (elsewhere you get FP16/FP32).
+Run on a Mac in the export env (`requirements-export.txt`, Python 3.12): Core ML INT8 quantization
+only works on macOS, and coremltools has no native build for newer Pythons.
 nms=True bakes non-max suppression in, so Vision returns VNRecognizedObjectObservation.
 Then drag the .mlpackage into ios/DebrisMapper/ and swap MockDetector for a Vision request.
+
+Contract with the iOS app (change only via the orchestrator): DebrisDetector.mlpackage, 640×640 input,
+NMS baked in, class names in sources.yaml order. The script checks these and exits non-zero if one fails.
+
+Note: Ultralytics pads the NMS stage to 80 classes (MLProgram shape workaround, ultralytics#22309).
+The padding columns always score 0, so read the top label (`labels.first`) and ignore any name
+that isn't one of our classes.
 """
 from __future__ import annotations
 
 import argparse
 import platform
+import shutil
+import sys
+from pathlib import Path
+
+from common import load_registry
+
+NAME = "DebrisDetector.mlpackage"
+
+
+def check(pkg: Path, imgsz: int, classes: list[str]) -> list[str]:
+    import coremltools as ct
+
+    spec = ct.models.MLModel(str(pkg), skip_model_load=True).get_spec()
+    problems = []
+    image = spec.description.input[0].type.imageType
+    if (image.width, image.height) != (imgsz, imgsz):
+        problems.append(f"input is {image.width}x{image.height}, expected {imgsz}x{imgsz}")
+    stages = [m for m in spec.pipeline.models] if spec.WhichOneof("Type") == "pipeline" else []
+    nms = [m for m in stages if m.WhichOneof("Type") == "nonMaximumSuppression"]
+    if not nms:
+        problems.append("no NMS stage in the pipeline")
+    else:
+        labels = list(nms[0].nonMaximumSuppression.stringClassLabels.vector)
+        if labels[: len(classes)] != classes:
+            problems.append(f"class labels {labels[:len(classes)]} != {classes}")
+        print(f"  NMS labels: {labels[:len(classes)]} (+{len(labels) - len(classes)} zero-score padding)")
+    size_mb = sum(f.stat().st_size for f in pkg.rglob("*") if f.is_file()) / 1e6
+    print(f"  input {image.width}x{image.height}, size {size_mb:.1f} MB")
+    if size_mb > 4:
+        problems.append(f"{size_mb:.1f} MB is over the ~3 MB target")
+    return problems
 
 
 def main() -> None:
@@ -22,8 +61,16 @@ def main() -> None:
         print("Warning: not macOS — INT8 quantization will be skipped by Core ML tools.")
     from ultralytics import YOLO
 
-    path = YOLO(args.weights).export(format="coreml", int8=True, nms=True, imgsz=args.imgsz)
-    print(f"Core ML package: {path}")
+    path = Path(YOLO(args.weights).export(format="coreml", int8=True, nms=True, imgsz=args.imgsz))
+    out = path.with_name(NAME)
+    if out.exists():
+        shutil.rmtree(out)
+    path.rename(out)
+    print(f"Core ML package: {out}")
+    problems = check(out, args.imgsz, load_registry()["classes"])
+    for p in problems:
+        print(f"  CONTRACT: {p}")
+    sys.exit(1 if problems else 0)
 
 
 if __name__ == "__main__":
