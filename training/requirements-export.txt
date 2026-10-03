@@ -1,0 +1,11 @@
+# Core ML export env (macOS). coremltools has no native build for Python 3.14, so use 3.12:
+#   /opt/homebrew/bin/python3.12 -m venv .venv-export && .venv-export/bin/pip install -r requirements-export.txt
+# Pins found working 2026-10-03: coremltools' torch frontend breaks on NumPy 2 ("only 0-dimensional arrays
+# can be converted to Python scalars"), INT8 needs scikit-learn, and OpenCV ≥4.12 requires NumPy 2.
+torch==2.7.0
+torchvision==0.22.0
+ultralytics>=8.3
+coremltools>=8.3
+numpy<2
+scikit-learn<1.7
+opencv-python<4.12

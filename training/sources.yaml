@@ -1,0 +1,261 @@
+# Dataset registry + collection checklist for the Debris Mapper detector.
+#
+# Every source we might train on lives here. Scripts read this file:
+#   fetch.py   downloads `kind: roboflow` sources (needs ROBOFLOW_API_KEY)
+#   sheet.py   builds a contact sheet so a person can eyeball viewpoint/quality
+#   merge.py   remaps classes, dedups, caps, and writes the merged YOLO dataset
+#
+# status: todo → requested → downloaded → checked → (merged automatically when checked); rejected = looked, not usable
+#   "checked" means a person looked at the contact sheet: ground-level, storm-relevant, license OK.
+#   merge.py only uses sources with status: checked (or --include-downloaded for a quick test).
+# role: train (default) | test (held-out evaluation; never trained on) | pool (unlabeled, for prelabel.py)
+# class_map: source class name → one of `classes`, or null to drop those boxes.
+#   Unmapped names are reported by `merge.py --check` so we can fill them in.
+# cap: max images taken from this source (random, seeded) so big sets don't swamp small ones.
+# License fields marked "unverified" came from search snippets; confirm on the dataset page.
+
+classes:
+  - fallen_tree          # 0
+  - damaged_building     # 1
+  - rubble_debris        # 2
+  - downed_line_or_pole  # 3
+  - fire_smoke           # 4
+
+# Text prompts for Grounding DINO pre-labeling (prelabel.py). Each prompt → class.
+prompts:
+  fallen tree: fallen_tree
+  uprooted tree: fallen_tree
+  tree fallen on a house: fallen_tree
+  damaged house: damaged_building
+  house with roof torn off: damaged_building
+  collapsed building: damaged_building
+  pile of debris: rubble_debris
+  rubble: rubble_debris
+  downed power line: downed_line_or_pole
+  fallen utility pole: downed_line_or_pole
+  fire: fire_smoke
+  smoke: fire_smoke
+
+sources:
+  # ---------- Ready-made boxes ----------
+  - id: dfire
+    name: D-Fire
+    url: https://github.com/gaiasd/DFireDataset
+    kind: manual            # OneDrive links in the repo README; fetch.py uses the README's Kaggle mirror (~3 GB)
+    download_url: https://www.kaggle.com/api/v1/datasets/download/sayedgamal99/smoke-fire-detection-yolo
+    license: CC0 1.0 (compilation; LICENSE file read 2026-10-01)
+    viewpoint: ground / CCTV
+    status: checked
+    names: [smoke, fire]    # 0=smoke 1=fire (Kaggle data.yaml); 21,527 images (14,122 train / 3,099 val / 4,306 test)
+    class_map: {smoke: fire_smoke, fire: fire_smoke}
+    cap: 3000
+    negatives: true         # keep some no-fire images as backgrounds
+    negative_cap: 1000
+    notes: Unzip to data/raw/dfire/ (data/{train,val,test}/{images,labels}). Eyeballed 2026-10-01 — ground + CCTV, many sunset/fog negatives.
+
+  # Roboflow Universe sets. Universe exports can't be downloaded directly (the API key isn't
+  # available in cloud sessions, and the MCP's export links for Universe versions 404), so each
+  # usable set is forked PRIVATE into our workspace (`pandji`), given a raw version
+  # (auto-orient only, no resize/augmentation), and exported from there. `universe:` is the
+  # original project, for attribution. fetch.py downloads `workspace/project/version` as usual.
+  - id: rf_fallen_trees_visual_deformity
+    name: Roboflow – Fallen Trees (visual-deformity), 335 imgs
+    url: https://universe.roboflow.com/visual-deformity/fallen-trees-pka1c
+    kind: roboflow
+    workspace: pandji
+    project: fallen-trees-pka1c-w3k7t   # private fork of visual-deformity/fallen-trees-pka1c v6 data
+    version: 1
+    license: CC BY 4.0 (Universe listing, 2026-10-02)
+    viewpoint: ground (phone/news photos of typhoon tree-falls in streets; contact sheet 2026-10-02)
+    status: checked
+    names: ["0"]                        # single unnamed class
+    class_map: {"0": fallen_tree}
+    cap: 1500
+
+  - id: rf_fallen_trees_steve_chun
+    name: Roboflow – Fallen Trees (steve-chun → now rogue-recon), 6.5k imgs
+    url: https://universe.roboflow.com/rogue-recon/fallen-trees
+    kind: roboflow
+    workspace: rogue-recon
+    project: fallen-trees
+    license: Public Domain (Universe listing)
+    viewpoint: drone, top-down windthrow (sampled 12 on Universe 2026-10-02)
+    status: rejected
+    class_map: {treefall: fallen_tree, roots: null}
+    cap: 1500
+    notes: Not forked. Every sample is nadir drone imagery of forest blowdown; wrong viewpoint.
+
+  - id: rf_fallen_trees_palms
+    name: Roboflow – Fallen trees (with palms), 8.7k imgs
+    url: https://universe.roboflow.com/overflow-thaap/fallen-trees-with-palms
+    kind: roboflow
+    workspace: pandji
+    project: fallen-trees-with-palms-70rke   # private fork
+    version: 1
+    license: CC BY 4.0 (Universe listing) — images look web-scraped (news, Weibo, Alamy watermarks)
+    viewpoint: ground (storm tree-falls in streets/parks; contact sheet 2026-10-02)
+    status: checked
+    notes: Noisier than the other tree sets — pre-augmented (grain, rotation), some collages and loose boxes. Capped.
+    class_map: {fallen_tree: fallen_tree, a: null}
+    cap: 1500
+
+  - id: rf_fallen_trees_origin
+    name: Roboflow – Fallen_Trees_Origin, 1.8k imgs
+    url: https://universe.roboflow.com/testws-u4esm/fallen_trees_origin-0tn0t
+    kind: roboflow
+    workspace: pandji
+    project: fallen_trees_origin-0tn0t-hcpdf   # private fork
+    version: 1
+    license: CC BY 4.0 (shown on fork; not on Universe search) — images web-scraped (Shutterstock/Bigstock/news watermarks)
+    viewpoint: ground (storm tree-falls on streets/cars, some forest deadfall; contact sheet 2026-10-02)
+    status: checked
+    class_map: {fallen_tree: fallen_tree, person: null}
+    cap: 2000
+
+  - id: rf_rubble_detection
+    name: Roboflow – Rubble Detection (earthquake)
+    url: https://universe.roboflow.com/rubble-project/rubble-detection
+    kind: roboflow
+    workspace: rubble-project
+    project: rubble-detection
+    license: unknown
+    viewpoint: satellite (sampled 12 on Universe 2026-10-02)
+    status: rejected
+    class_map: {Rubble: rubble_debris}
+    cap: 1000
+    notes: Not forked. Turkey 2023 earthquake satellite tiles; wrong viewpoint.
+
+  - id: rf_damaged_building
+    name: Roboflow – Damaged Building (building-damaged), 43 imgs
+    url: https://universe.roboflow.com/building-damaged/damaged-building
+    kind: roboflow
+    workspace: building-damaged
+    project: damaged-building
+    license: CC BY 4.0 (Universe listing)
+    viewpoint: satellite (sampled on Universe 2026-10-02)
+    status: rejected
+    class_map: {}
+    cap: 1000
+    notes: Not forked. Satellite tiles, 43 images.
+
+  - id: rf_disaster_detection
+    name: Roboflow – DISASTER_detection
+    url: https://universe.roboflow.com/asderids/disaster_detection-d9uqt
+    kind: roboflow
+    workspace: asderids
+    project: disaster_detection-d9uqt
+    license: unknown
+    viewpoint: unknown
+    status: rejected
+    class_map: {}
+    cap: 1000
+    notes: Not forked. Project now has 0 images and no versions (checked 2026-10-02).
+
+  - id: rf_damaged_building_tls
+    name: Roboflow – damaged-building (tls), 428 labeled imgs
+    url: https://universe.roboflow.com/tls-fx17y/damaged-building-jytkn
+    kind: roboflow
+    workspace: pandji
+    project: damaged-building-jytkn-hohdk   # private fork
+    version: 1
+    license: CC BY 4.0 (Universe listing) — images look web-scraped
+    viewpoint: ground, but mostly earthquake/war/demolition damage to concrete high-rises, not wind damage
+    status: rejected        # Andrew 2026-10-02: wrong domain (earthquake/war high-rises), watermarks are a shortcut
+    class_map: {damaged-building: damaged_building, damaged-part: null}
+    notes: Found via universe_search 2026-10-02. Many Shutterstock/Alamy watermarked frames.
+    cap: 1000
+
+  - id: rf_utility_pole
+    name: Roboflow – utility pole (Compromised-Pole / Stable), 10k imgs
+    url: https://universe.roboflow.com/dequillaprojects/utility-pole-y8w7k
+    kind: roboflow
+    workspace: pandji
+    project: utility-pole-y8w7k-zfcgm   # private fork
+    version: 1
+    license: CC BY 4.0 (Universe listing) — many frames are Google Street View captures
+    viewpoint: ground (snapped/leaning/fallen poles with wires down, storms and vehicle crashes; contact sheet 2026-10-02)
+    status: checked
+    class_map: {Compromised-Pole: downed_line_or_pole, Stable: null}
+    notes: >
+      Found via universe_search 2026-10-02. The only ground-level downed-pole boxes we know of.
+      Images are pre-augmented (rotations, grain), so near-duplicates exist; a few boxes are
+      streetlights or signs. Boxes cover the pole, not the wire.
+    cap: 1500
+
+  - id: rf_house_damage_level
+    name: Roboflow – HOUSE DAMAGE LEVEL, 1.2k imgs
+    url: https://universe.roboflow.com/anne-pearl-inting/house-damage-level
+    kind: roboflow
+    workspace: pandji
+    project: house-damage-level-ughkd   # private fork
+    version: 1
+    license: CC BY 4.0 (Universe listing) — images look web-scraped; a few look AI-generated
+    viewpoint: ground after filtering (typhoon/tornado house damage); contact sheets 2026-10-02
+    status: checked         # Andrew 2026-10-02: include, minus AI-generated-looking and aerial frames
+    exclude: manifests/excludes/rf_house_damage_level.txt   # 388 of 767 damaged-house originals (265 AI-looking, 123 aerial)
+    class_map: {TOTALLY DAMAGED: damaged_building, PARTIALLY DAMAGED: damaged_building, UNDAMAGED: null}
+    cap: 1000
+    notes: Found via universe_search 2026-10-02 while looking for damaged_building sources.
+
+  - id: rf_hurricane_earthquake
+    name: Roboflow – Hurricane + Earthquake (FEMA damage levels), 595 imgs
+    url: https://universe.roboflow.com/first-round-testing-datasets-zrdeg/hurricane---earthquake
+    kind: roboflow
+    workspace: pandji
+    project: hurricane---earthquake-rdui8   # private fork
+    version: 1
+    license: CC BY 4.0 (Universe listing) — images look web-scraped
+    viewpoint: ground (US Gulf hurricane damage to houses; contact sheet 2026-10-02)
+    status: checked
+    class_map: {destroyed: damaged_building, major: damaged_building, minor: null, affected: null}
+    cap: 1000
+    notes: >
+      Found via universe_search 2026-10-02. Every frame has a heavy HDR filter baked in (domain shift).
+      "minor"/"affected" boxes mostly show houses that look intact from the street, so they're dropped.
+
+  - id: gdbda
+    name: GDBDA (ground-level building damage, 856 smartphone photos)
+    url: https://www.mdpi.com/2072-4292/14/12/2763
+    kind: manual
+    license: unknown — request from authors
+    viewpoint: ground (smartphone)
+    status: todo            # → requested once we email the authors
+    class_map: {debris: rubble_debris, collapse: damaged_building, spalling: null, crack: null}
+    cap: 1000
+    notes: Earthquake damage (concrete), not tornado (wood/roofs). Best ground-level box set we know of.
+
+  # ---------- Our own labels ----------
+  - id: fema_tornado_test
+    name: FEMA tornado photos — held-out test set (hand-labeled)
+    url: https://commons.wikimedia.org/wiki/Category:Tornado_damage
+    kind: commons           # fema.gov blocks automated downloads; FEMA/NWS photos are mirrored on Commons
+    role: test
+    license: per photo in attribution.csv (PD / CC BY / CC BY-SA only)
+    viewpoint: ground
+    status: downloaded      # 193 photos; in Roboflow (split test, tag heldout-test), awaiting hand labels
+    class_map: {}           # labeled directly with our class names
+    notes: >
+      300–500 photos from tornado events that NO training source uses.
+      `commons.py download ... fema_tornado_test --events ...` records each photo's event in
+      attribution.csv; pool downloads use --exclude-events-of fema_tornado_test.
+      Label by hand in Roboflow/CVAT with our 5 classes. Never train on this.
+
+  - id: fema_pool
+    name: FEMA / NWS / Commons storm photos — unlabeled pool for pre-labeling
+    url: https://commons.wikimedia.org/wiki/Category:Tornado_damage
+    kind: commons
+    role: pool
+    license: per photo in attribution.csv (PD / CC BY / CC BY-SA only)
+    viewpoint: ground
+    status: todo
+    notes: Put images in data/raw/fema_pool/images/, run prelabel.py, review every box, then add the reviewed export as a new train source. Priority — downed lines/poles.
+
+  - id: incidents1m
+    name: Incidents1M (MIT) — classification-only pool
+    url: https://github.com/ethanweber/IncidentsDataset
+    kind: manual
+    role: pool
+    license: labels MIT; images are web URLs, copyright stays with owners (research use)
+    viewpoint: mostly ground
+    status: todo
+    notes: Request access via the form in the repo README. Use only to pick candidate photos (tornado, damaged, collapsed, blocked) for prelabel.py.

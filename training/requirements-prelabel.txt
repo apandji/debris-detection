@@ -1,0 +1,2 @@
+-r requirements.txt
+transformers>=4.45   # Grounding DINO (IDEA-Research/grounding-dino-tiny) via Hugging Face

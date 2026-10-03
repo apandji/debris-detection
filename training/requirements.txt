@@ -1,0 +1,6 @@
+ultralytics>=8.3
+roboflow
+pyyaml
+pillow
+imagehash
+albumentations
