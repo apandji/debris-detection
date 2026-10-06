@@ -1,6 +1,6 @@
 """Draft boxes with Grounding DINO for a person to review. Never train on unreviewed output.
 
-    pip install -r requirements-prelabel.txt          # GPU recommended; CPU works (~5–10 s/image)
+    pip install -r requirements-prelabel.txt          # CUDA or Apple Silicon (MPS); CPU works (~5–10 s/image)
     python scripts/prelabel.py data/raw/fema_pool/images data/prelabeled/fema_pool
     python scripts/prelabel.py ... --limit 20         # quick look first
 
@@ -57,7 +57,7 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("images", type=Path)
     ap.add_argument("out", type=Path)
-    ap.add_argument("--box-threshold", type=float, default=0.25)  # 12 prompts in one query dilute scores
+    ap.add_argument("--box-threshold", type=float, default=0.30)  # 12 prompts in one query dilute scores
     ap.add_argument("--text-threshold", type=float, default=0.25)
     ap.add_argument("--limit", type=int)
     args = ap.parse_args()

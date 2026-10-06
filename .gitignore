@@ -13,3 +13,7 @@ training/.venv*/
 *.pt
 *.mlpackage/
 __pycache__/
+
+# secrets
+.env
+*.env

@@ -10,7 +10,8 @@ Three Claude agents work on this repo. Stay in your lane; anything cross-cutting
 |---|---|---|---|
 | **Orchestrator** | cloud session | `AGENTS.md`, `PRD.md`, planning, reviewing and merging agent branches into `ios-scaffold` | `ios-scaffold` |
 | **iOS dev** | local Mac (`~/Developer/debris-detection`, Xcode) | `ios/` | `ios-dev` |
-| **Model dev** | cloud session (open network, `ROBOFLOW_API_KEY`) | `training/`, `research/` | `model-dev` |
+| **Model dev (cloud)** | cloud session (open network, `ROBOFLOW_API_KEY`): downloads, crawling, Roboflow uploads | `training/`, `research/` | `model-dev` |
+| **Model dev (local)** | local Mac (Apple Silicon/MPS, `training/.env` holds the key): prelabels, training, Core ML export | `training/` | `model-local` (from `model-dev`) |
 
 - Branch off `ios-scaffold`, push your own branch, and report to the orchestrator; don't merge into `ios-scaffold` yourself.
 - **The contract between iOS and model** is the Core ML model: file `DebrisDetector.mlpackage`, 640×640 input, NMS baked in, class names in this order: `fallen_tree, damaged_building, rubble_debris, downed_line_or_pole, fire_smoke`. Changing it means telling the orchestrator first.
