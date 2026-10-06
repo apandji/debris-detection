@@ -94,12 +94,17 @@ struct ReportDetailView: View {
         }
         .navigationTitle(report.primaryClass?.title ?? "Report")
         .navigationBarTitleDisplayMode(.inline)
-        .safeAreaInset(edge: .top, spacing: 0) {
-            Text("\(displayName(report.authorID, report.authorName)) · \(report.createdAt.formatted(.relative(presentation: .named)))")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity)
-                .padding(.bottom, 4)
+        .toolbar {
+            // Title + byline in the bar, so scrolled content never runs under the byline.
+            ToolbarItem(placement: .principal) {
+                VStack(spacing: 0) {
+                    Text(report.primaryClass?.title ?? "Report")
+                        .font(.headline)
+                    Text("\(displayName(report.authorID, report.authorName)) · \(report.createdAt.formatted(.relative(presentation: .named)))")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
         }
     }
 
