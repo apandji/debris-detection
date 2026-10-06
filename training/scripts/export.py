@@ -1,6 +1,6 @@
 """Export a trained model to Core ML for the iOS app.
 
-    python scripts/export.py runs/debris/weights/best.pt      # → runs/debris/weights/DebrisDetector.mlpackage
+    python scripts/export.py runs/v0/weights/best.pt --version v0   # → runs/v0/weights/DebrisDetector.mlpackage
 
 Run on a Mac in the export env (`requirements-export.txt`, Python 3.12): Core ML INT8 quantization
 only works on macOS, and coremltools has no native build for newer Pythons.
@@ -27,6 +27,21 @@ from common import load_registry
 NAME = "DebrisDetector.mlpackage"
 
 
+def stamp_version(pkg: Path, version: str) -> None:
+    """Write the version into the package so the app can show it. iOS reads it as
+    model.modelDescription.metadata[.versionString] (or creatorDefinedKey "debrismapper.version")."""
+    import coremltools as ct
+
+    m = ct.models.MLModel(str(pkg), skip_model_load=True)
+    m.version = version
+    m.short_description = f"Debris Mapper detector {version}"
+    m.user_defined_metadata["debrismapper.version"] = version
+    tmp = pkg.with_name(f"{pkg.stem}.tmp.mlpackage")  # saving onto its own path deletes it first
+    m.save(str(tmp))
+    shutil.rmtree(pkg)
+    tmp.rename(pkg)
+
+
 def check(pkg: Path, imgsz: int, classes: list[str]) -> list[str]:
     import coremltools as ct
 
@@ -48,6 +63,7 @@ def check(pkg: Path, imgsz: int, classes: list[str]) -> list[str]:
     print(f"  input {image.width}x{image.height}, size {size_mb:.1f} MB")
     if size_mb > 4:
         problems.append(f"{size_mb:.1f} MB is over the ~3 MB target")
+    print(f"  version: {spec.description.metadata.versionString}")
     return problems
 
 
@@ -55,6 +71,7 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("weights")
     ap.add_argument("--imgsz", type=int, default=640)
+    ap.add_argument("--version", required=True, help="model version from manifests/models.yaml, e.g. v0")
     args = ap.parse_args()
 
     if platform.system() != "Darwin":
@@ -66,7 +83,8 @@ def main() -> None:
     if out.exists():
         shutil.rmtree(out)
     path.rename(out)
-    print(f"Core ML package: {out}")
+    stamp_version(out, args.version)
+    print(f"Core ML package: {out} ({args.version})")
     problems = check(out, args.imgsz, load_registry()["classes"])
     for p in problems:
         print(f"  CONTRACT: {p}")

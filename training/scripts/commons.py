@@ -166,6 +166,14 @@ def events(args) -> None:
         print(f"{n:5d}  {ev}   [{', '.join(f'{l} {c}' for l, c in lic)}]")
 
 
+def file_name(title: str) -> str:
+    """Safe local name. Long titles are cut, so add a hash of the full title to keep them unique."""
+    name = re.sub(r"[^\w.-]+", "_", title.removeprefix("File:"))
+    if len(name) > 150:
+        name = f"{name[:140]}_{hashlib.sha1(title.encode()).hexdigest()[:8]}"
+    return name if name.lower().endswith((".jpg", ".jpeg")) else name + ".jpg"
+
+
 def download(args) -> None:
     rows = load(args.manifest)
     if args.events:
@@ -195,12 +203,7 @@ def download(args) -> None:
             w.writeheader()
         n = 0
         for r in rows:
-            name = re.sub(r"[^\w.-]+", "_", r["title"].removeprefix("File:"))[:150]
-            if not name.lower().endswith((".jpg", ".jpeg")):
-                name += ".jpg"
-            if existing.get(name, r["title"]) != r["title"]:
-                # Long titles that share a 150-char prefix would overwrite each other's file.
-                name = f"{name[:140].removesuffix('.jpg')}_{hashlib.sha1(r['title'].encode()).hexdigest()[:8]}.jpg"
+            name = file_name(r["title"])
             if name in existing:
                 continue
             try:

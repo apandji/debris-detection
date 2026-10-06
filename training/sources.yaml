@@ -58,6 +58,10 @@ sources:
   # usable set is forked PRIVATE into our workspace (`pandji`), given a raw version
   # (auto-orient only, no resize/augmentation), and exported from there. `universe:` is the
   # original project, for attribution. fetch.py downloads `workspace/project/version` as usual.
+  # Andrew 2026-10-02: keep the forks in pandji until the project wraps (~1 week), then clean up.
+  # Licensing (Andrew 2026-10-02): Universe sets are accepted for this open-source research model on
+  # three conditions: never republish the images (git holds manifests only), credit every dataset
+  # (license + URL per source, below), and keep the held-out test set public-domain only.
   - id: rf_fallen_trees_visual_deformity
     name: Roboflow – Fallen Trees (visual-deformity), 335 imgs
     url: https://universe.roboflow.com/visual-deformity/fallen-trees-pka1c
@@ -156,7 +160,7 @@ sources:
     url: https://universe.roboflow.com/tls-fx17y/damaged-building-jytkn
     kind: roboflow
     workspace: pandji
-    project: damaged-building-jytkn-hohdk   # private fork
+    project: damaged-building-jytkn-hohdk   # private fork, DELETED 2026-10-02 (Roboflow Trash, restorable for 30 days)
     version: 1
     license: CC BY 4.0 (Universe listing) — images look web-scraped
     viewpoint: ground, but mostly earthquake/war/demolition damage to concrete high-rises, not wind damage
@@ -180,7 +184,7 @@ sources:
       Found via universe_search 2026-10-02. The only ground-level downed-pole boxes we know of.
       Images are pre-augmented (rotations, grain), so near-duplicates exist; a few boxes are
       streetlights or signs. Boxes cover the pole, not the wire.
-    cap: 1500
+    cap: 2000              # scarcest class: take every unique original
 
   - id: rf_house_damage_level
     name: Roboflow – HOUSE DAMAGE LEVEL, 1.2k imgs
@@ -245,9 +249,10 @@ sources:
     url: https://commons.wikimedia.org/wiki/Category:Tornado_damage
     kind: commons
     role: pool
-    license: per photo in attribution.csv (PD / CC BY / CC BY-SA only)
-    viewpoint: ground
-    status: todo
+    license: per photo in manifests/fema_pool_attribution.csv (PD 73%, CC BY-SA, CC BY, CC0; no NC/ND)
+    viewpoint: ground (mostly; some aerials and press-event photos)
+    status: downloaded      # 4,602 photos, 139 events; in pandji/storm-debris-detection (split train, tags commons+pool), unlabeled
+    prelabels: manifests/prelabels/fema_pool_gdino_drafts.jsonl   # Grounding DINO drafts, 1,568 of 4,602 (unreviewed)
     notes: Put images in data/raw/fema_pool/images/, run prelabel.py, review every box, then add the reviewed export as a new train source. Priority — downed lines/poles.
 
   - id: incidents1m

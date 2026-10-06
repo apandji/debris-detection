@@ -7,19 +7,22 @@ struct ReportMapView: View {
 
     @Environment(ReportStore.self) private var store
     @State private var position: MapCameraPosition = .userLocation(fallback: .automatic)
-    @State private var selected: Report?
+    @State private var selectedID: Report.ID?
 
     var body: some View {
-        Map(position: $position) {
+        // System balloon markers: their tip sits on the coordinate, so a report
+        // posted where you're standing stays tappable above the blue location dot.
+        Map(position: $position, selection: $selectedID) {
             UserAnnotation()
             ForEach(store.reports) { report in
-                Annotation(report.primaryClass?.title ?? "Report", coordinate: report.coordinate) {
-                    Button { selected = report } label: {
-                        ReportPin(report: report, isSelected: selected?.id == report.id)
-                    }
-                    .buttonStyle(.plain)
-                }
+                Marker(
+                    report.primaryClass?.title ?? "Report",
+                    systemImage: report.primaryClass?.symbol ?? "mappin",
+                    coordinate: report.coordinate
+                )
+                .tint(report.primaryClass?.color ?? .red)
                 .annotationTitles(.hidden)
+                .tag(report.id)
             }
         }
         .mapStyle(.standard(pointsOfInterest: .excludingAll))
@@ -35,10 +38,15 @@ struct ReportMapView: View {
                 .background(.regularMaterial, in: Capsule())
                 .padding(.top, 8)
         }
-        .sheet(item: $selected) { report in
-            ReportDetailView(reportID: report.id)
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
+        .sheet(isPresented: isShowingReport) {
+            if let selectedID {
+                ReportDetailView(reportID: selectedID)
+                    .id(selectedID)
+                    .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
+                    // Keep the map live behind the sheet so another pin can be tapped.
+                    .presentationBackgroundInteraction(.enabled(upThrough: .medium))
+            }
         }
         .onChange(of: focusedReportID, initial: true) { _, id in
             guard let id, let report = store.report(id: id) else { return }
@@ -51,8 +59,15 @@ struct ReportMapView: View {
             }
             focusedReportID = nil
             // Let the Review cover finish dismissing before presenting the sheet.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { selected = report }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { selectedID = report.id }
         }
+    }
+
+    private var isShowingReport: Binding<Bool> {
+        Binding(
+            get: { selectedID != nil },
+            set: { if !$0 { selectedID = nil } }
+        )
     }
 
     private var countText: String {
@@ -62,22 +77,5 @@ struct ReportMapView: View {
         case 1: return "1 report from neighbors"
         default: return "\(n) reports from neighbors"
         }
-    }
-}
-
-struct ReportPin: View {
-    let report: Report
-    var isSelected = false
-
-    var body: some View {
-        let cls = report.primaryClass
-        Image(systemName: cls?.symbol ?? "mappin")
-            .font(.system(size: isSelected ? 17 : 14, weight: .semibold))
-            .foregroundStyle(.white)
-            .frame(width: isSelected ? 40 : 32, height: isSelected ? 40 : 32)
-            .background(cls?.color ?? .red, in: Circle())
-            .overlay(Circle().stroke(.white, lineWidth: 2))
-            .shadow(color: .black.opacity(0.2), radius: 3, y: 1)
-            .animation(.snappy, value: isSelected)
     }
 }
