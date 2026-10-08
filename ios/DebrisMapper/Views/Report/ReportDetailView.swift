@@ -180,6 +180,7 @@ struct VoiceNoteRow: View {
                 Image(systemName: isPlaying ? "stop.circle.fill" : "play.circle.fill")
                     .font(.title2)
                     .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(.tint)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(displayName(note.authorID, note.authorName)).foregroundStyle(.primary)
                     Text(note.createdAt.formatted(.relative(presentation: .named)))
@@ -192,6 +193,9 @@ struct VoiceNoteRow: View {
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
             }
+            .contentShape(Rectangle())
         }
+        // Plain, so only the play icon carries the tint; the row text stays primary/secondary.
+        .buttonStyle(.plain)
     }
 }

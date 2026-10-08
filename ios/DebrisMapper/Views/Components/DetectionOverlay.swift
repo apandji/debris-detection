@@ -71,6 +71,9 @@ struct DetectionPhoto: View {
             .overlay(alignment: .topLeading) {
                 Text(d.label.title)
                     .font(.caption2.weight(.semibold))
+                    // One line, even past a narrow box's edge, so labels never wrap or truncate.
+                    .lineLimit(1)
+                    .fixedSize()
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
                     .background(color, in: Capsule())
