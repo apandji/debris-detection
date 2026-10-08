@@ -68,8 +68,8 @@ def main() -> None:
     # A fresh checkout has no data/, so anything downloadable that's missing is fetched again
     # (status stays as-is: a re-download of a checked source is still checked).
     downloadable = lambda s: s.get("download_url") or s["kind"] == "roboflow"
-    todo = [s for s in sources if args.force or s["status"] == "todo"
-            or (downloadable(s) and not source_dir(s).exists())]
+    todo = [s for s in sources if s["status"] != "rejected" and (args.force or s["status"] == "todo"
+            or (downloadable(s) and not source_dir(s).exists()))]
     rf_sources = [s for s in todo if s["kind"] == "roboflow"]
     for s in todo:
         if s.get("download_url"):

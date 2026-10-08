@@ -4,15 +4,16 @@ Guidance for coding agents working on this repo.
 
 ## Team (who owns what)
 
-Three Claude agents work on this repo. Stay in your lane; anything cross-cutting goes to the orchestrator.
+Two Claude sessions work on this repo, both on Andrew's Mac. Stay in your lane; anything cross-cutting goes to the orchestrator.
 
-| Agent | Runs | Owns | Branch |
+| Agent | Session | Owns | Branch |
 |---|---|---|---|
-| **Orchestrator** | cloud session | `AGENTS.md`, `PRD.md`, planning, reviewing and merging agent branches into `ios-scaffold` | `ios-scaffold` |
-| **iOS dev** | local Mac (`~/Developer/debris-detection`, Xcode) | `ios/` | `ios-dev` |
-| **Model dev** | cloud session (open network, `ROBOFLOW_API_KEY`) | `training/`, `research/` | `model-dev` |
+| **Orchestrator + model dev** | `LOCAL MODEL TRAINER` (Apple Silicon/MPS, `training/.env` holds the Roboflow key) | `AGENTS.md`, `PRD.md`, planning, reviewing and merging into `main`; `training/`, `research/`, model releases | `model-local` |
+| **iOS dev** | `iOS DEV` (Xcode) | `ios/` | `ios-dev` |
 
-- Branch off `ios-scaffold`, push your own branch, and report to the orchestrator; don't merge into `ios-scaffold` yourself.
+- **`main` is the integration branch** (since 2026-10-06). Branch off `main`, push your branch, open a PR into `main`, and tell the orchestrator. Only the orchestrator merges.
+- Retired: `ios-scaffold` (old integration branch, merged into `main`) and `model-dev` (cloud model agent, finished 2026-10-02, merged).
+- Model versions: `training/manifests/models.yaml` is the registry. Each version is a private GitHub Release `model-<version>` (zipped `.mlpackage` + `best.pt`); `ios/fetch-model.sh` downloads it. The package carries its version (`versionString`), and the app shows it.
 - **The contract between iOS and model** is the Core ML model: file `DebrisDetector.mlpackage`, 640×640 input, NMS baked in, class names in this order: `fallen_tree, damaged_building, rubble_debris, downed_line_or_pole, fire_smoke`. Changing it means telling the orchestrator first.
 - Images and labels live in the Roboflow project **`pandji/storm-debris-detection`** (private). Git holds code, registries, and manifests only, never images.
 
