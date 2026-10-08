@@ -49,7 +49,9 @@ struct CoreMLDetector: Detector {
         // Labels are sorted by confidence, so the top one is the real class.
         guard let top = observation.labels.first,
               let label = DebrisClass(modelName: top.identifier) else { return nil }
-        let confidence = Double(top.confidence)
+        // Vision normalizes label confidences to sum to 1 (so the top one reads ~0.99),
+        // and puts the row's raw total on the observation. Their product is the model's class score.
+        let confidence = Double(observation.confidence * top.confidence)
         let threshold = label == .downedLineOrPole ? downedLineThreshold : confidenceThreshold
         guard confidence >= threshold else { return nil }
         // Vision boxes are normalized with a bottom-left origin; ours are top-left.
