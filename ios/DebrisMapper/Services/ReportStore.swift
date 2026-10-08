@@ -159,8 +159,8 @@ final class ReportStore {
         let neighbors = (0..<5).map { _ in FriendlyName.random() }
         let seeds: [(DebrisClass, Double, Double)] = [
             (.fallenTree, 0.0021, -0.0014),
-            (.downedPowerLine, -0.0016, 0.0025),
-            (.rubblePile, 0.0009, 0.0031),
+            (.downedLineOrPole, -0.0016, 0.0025),
+            (.rubbleDebris, 0.0009, 0.0031),
             (.damagedBuilding, -0.0028, -0.0019),
             (.fallenTree, 0.0034, 0.0007),
         ]

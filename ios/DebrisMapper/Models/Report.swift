@@ -1,21 +1,54 @@
 import Foundation
 import CoreLocation
 
-/// Debris classes for the PoC. Keep in sync with the web PoC and PRD §9.
+/// Debris classes. Order and model names match the Core ML contract
+/// (AGENTS.md): fallen_tree, damaged_building, rubble_debris, downed_line_or_pole, fire_smoke.
 enum DebrisClass: String, Codable, CaseIterable, Identifiable {
     case fallenTree
     case damagedBuilding
-    case rubblePile
-    case downedPowerLine
+    case rubbleDebris
+    case downedLineOrPole
+    case fireSmoke
 
     var id: String { rawValue }
+
+    /// Label name in DebrisDetector.mlpackage.
+    var modelName: String {
+        switch self {
+        case .fallenTree: "fallen_tree"
+        case .damagedBuilding: "damaged_building"
+        case .rubbleDebris: "rubble_debris"
+        case .downedLineOrPole: "downed_line_or_pole"
+        case .fireSmoke: "fire_smoke"
+        }
+    }
+
+    init?(modelName: String) {
+        guard let match = Self.allCases.first(where: { $0.modelName == modelName }) else { return nil }
+        self = match
+    }
+
+    /// Reports saved before the 5-class model used the PoC names.
+    init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        switch raw {
+        case "rubblePile": self = .rubbleDebris
+        case "downedPowerLine": self = .downedLineOrPole
+        default:
+            guard let value = Self(rawValue: raw) else {
+                throw DecodingError.dataCorrupted(.init(codingPath: decoder.codingPath, debugDescription: "Unknown class \(raw)"))
+            }
+            self = value
+        }
+    }
 
     var title: String {
         switch self {
         case .fallenTree: "Fallen tree"
         case .damagedBuilding: "Damaged building"
-        case .rubblePile: "Rubble pile"
-        case .downedPowerLine: "Downed power line"
+        case .rubbleDebris: "Rubble or debris"
+        case .downedLineOrPole: "Downed line or pole"
+        case .fireSmoke: "Fire or smoke"
         }
     }
 
@@ -23,8 +56,9 @@ enum DebrisClass: String, Codable, CaseIterable, Identifiable {
         switch self {
         case .fallenTree: "tree.fill"
         case .damagedBuilding: "house.fill"
-        case .rubblePile: "square.stack.3d.down.right.fill"
-        case .downedPowerLine: "bolt.fill"
+        case .rubbleDebris: "square.stack.3d.down.right.fill"
+        case .downedLineOrPole: "bolt.fill"
+        case .fireSmoke: "flame.fill"
         }
     }
 }
@@ -51,6 +85,8 @@ struct Detection: Identifiable, Codable, Hashable {
     var source: Source = .model
     /// Model confidence; nil for boxes people drew.
     var confidence: Double?
+    /// Which model suggested this box (e.g. "v0"), so labels trace back to it. nil for boxes people drew.
+    var modelVersion: String?
     /// Set when a neighbor corrected another box (label or position). The original stays.
     var revisionOf: UUID?
     /// userID → true (yes) / false (no)

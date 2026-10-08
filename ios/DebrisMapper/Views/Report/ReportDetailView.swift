@@ -62,9 +62,7 @@ struct ReportDetailView: View {
                 Text("A box is confirmed once \(Detection.confirmThreshold) neighbors say yes. Wrong label or spot? Edit Boxes to suggest a fix.")
             }
 
-            if report.detections.contains(where: { $0.label == .downedPowerLine }) {
-                PowerLineWarning()
-            }
+            SafetyWarnings(labels: report.detections.map(\.label))
 
             Section {
                 ForEach(report.voiceNotes) { note in

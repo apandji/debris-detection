@@ -59,14 +59,17 @@ struct ReviewView: View {
                         }
                     }
                 } footer: {
-                    if !isDetecting && !detections.isEmpty {
-                        Text("These are our best guesses. Tap ✓ if we got it right, ✕ if not, or Edit to fix a label or box. Neighbors get a say once it's posted.")
+                    if !isDetecting {
+                        VStack(alignment: .leading, spacing: 6) {
+                            if !detections.isEmpty {
+                                Text("These are our best guesses. Tap ✓ if we got it right, ✕ if not, or Edit to fix a label or box. Neighbors get a say once it's posted.")
+                            }
+                            ModelVersionNote()
+                        }
                     }
                 }
 
-                if detections.contains(where: { $0.label == .downedPowerLine }) {
-                    PowerLineWarning()
-                }
+                SafetyWarnings(labels: detections.map(\.label))
 
                 Section {
                     LabeledContent {
@@ -105,7 +108,7 @@ struct ReviewView: View {
                 )
             }
             .task {
-                detections = await MockDetector.detect(in: photo.image)
+                detections = await Detectors.current.detect(in: photo.image)
                 isDetecting = false
             }
         }
@@ -121,6 +124,7 @@ struct ReviewView: View {
                 guard old.label != d.label || old.box != d.box else { return d }
                 d.source = .person
                 d.confidence = nil
+                d.modelVersion = nil
             }
             d.votes[CurrentUser.id] = true
             return d
@@ -167,21 +171,45 @@ struct DetectionRow<Trailing: View>: View {
         if detection.revisionOf != nil { return "A neighbor's fix" }
         switch detection.source {
         case .person: return "Added by hand"
-        case .model: return "Our guess · \(Int((detection.confidence ?? 0) * 100))% sure"
+        case .model:
+            let sure = "\(Int((detection.confidence ?? 0) * 100))% sure"
+            if let version = detection.modelVersion { return "Model \(version) · \(sure)" }
+            return "Our guess · \(sure)"
         }
     }
 }
 
-/// Safety note whenever a downed power line is in play (PRD §14).
-struct PowerLineWarning: View {
+/// Plain safety notes for hazardous classes (PRD §14). Shown once per class present.
+struct SafetyWarnings: View {
+    let labels: [DebrisClass]
+
     var body: some View {
+        if labels.contains(.downedLineOrPole) {
+            warning("Stay at least 35 feet back from downed lines (assume they're live) and call your utility or 911.")
+        }
+        if labels.contains(.fireSmoke) {
+            warning("If there's fire or heavy smoke, keep your distance and call 911.")
+        }
+    }
+
+    private func warning(_ text: String) -> some View {
         Section {
             Label {
-                Text("Stay at least 35 feet back from downed lines (assume they're live) and call your utility or 911.")
-                    .font(.subheadline)
+                Text(text).font(.subheadline)
             } icon: {
                 Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
             }
+        }
+    }
+}
+
+/// "Suggestions by model v0" — or a note that the demo stand-in is running.
+struct ModelVersionNote: View {
+    var body: some View {
+        if let version = Detectors.current.modelVersion {
+            Text("Suggestions by model \(version), running on your phone.")
+        } else {
+            Text("No model on board, so these are demo guesses.")
         }
     }
 }
