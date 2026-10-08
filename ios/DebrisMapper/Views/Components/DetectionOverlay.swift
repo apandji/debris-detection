@@ -5,8 +5,9 @@ extension DebrisClass {
         switch self {
         case .fallenTree: .green
         case .damagedBuilding: .orange
-        case .rubblePile: .brown
-        case .downedPowerLine: .yellow
+        case .rubbleDebris: .brown
+        case .downedLineOrPole: .yellow
+        case .fireSmoke: .red
         }
     }
 }

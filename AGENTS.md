@@ -19,9 +19,9 @@ Two Claude sessions work on this repo, both on Andrew's Mac. Stay in your lane; 
 
 ## Purpose
 
-**Debris Mapper**: neighbors photograph storm debris, a (mocked) YOLO model suggests what's in the photo, and people confirm or reject those suggestions. Reports are pinned on a shared map. It's social: anyone can open any report, vote on its boxes, fix a label or box, add a box, and leave voice notes. Human-confirmed labels later become training data.
+**Debris Mapper**: neighbors photograph storm debris, an on-device YOLO model (Core ML) suggests what's in the photo, and people confirm or reject those suggestions. Reports are pinned on a shared map. It's social: anyone can open any report, vote on its boxes, fix a label or box, add a box, and leave voice notes. Human-confirmed labels later become training data.
 
-Debris classes (PoC): fallen tree, damaged building, rubble pile, downed power line. Don't add classes unless asked.
+Debris classes (the model contract): fallen tree, damaged building, rubble or debris, downed line or pole, fire or smoke. Don't add classes unless asked.
 
 See `PRD.md` for product intent and decisions. Tone: **neighborly and a little playful** ("Squinting at your photo…"), never at the expense of people who were hurt, and always plain about safety.
 
@@ -37,7 +37,7 @@ See `PRD.md` for product intent and decisions. Tone: **neighborly and a little p
 |---|---|
 | Camera capture (AVFoundation) | Real. Simulator has no camera, so it falls back to the photo library picker. |
 | Location | Real device GPS at capture time. Library photos prefer EXIF GPS. **Posting is blocked without a location.** |
-| YOLO detection | **Mock** (`MockDetector`): 1–3 random boxes/classes after ~0.9 s. |
+| YOLO detection | **Real, on-device**: `CoreMLDetector` runs the bundled `DebrisDetector.mlpackage` (v0) via Vision. Cutoff 0.25, 0.15 for downed lines. Each suggested box stores `modelVersion`; Review shows "Model v0". Falls back to `MockDetector` (1–3 random boxes) when the model isn't fetched. |
 | Voting (yes / no) and box editing | Real UI; stored **locally only**. |
 | Voice notes | Real recording/playback (AVAudioRecorder, .m4a, **30 s cap**); stored **locally only**. |
 | "Other neighbors" | **Fake.** Five seeded reports with friendly handles scattered around your first location fix, with fake votes. No photos (placeholder shown). |
@@ -50,15 +50,18 @@ See `PRD.md` for product intent and decisions. Tone: **neighborly and a little p
 ios/
   DebrisMapper.xcodeproj      # Xcode 16 project; uses a synced folder, so new files in DebrisMapper/ are picked up automatically
   project.yml                 # XcodeGen fallback only (if the .xcodeproj won't open)
+  fetch-model.sh              # Downloads release model-<version> (default v0) into DebrisMapper/ML/
   DebrisMapper/
     App/DebrisMapperApp.swift # @main, RootView with two tabs: Capture, Map
     Models/Report.swift       # DebrisClass, BoundingBox, Detection (+votes), VoiceNote, Report
     Services/
       ReportStore.swift       # @Observable store, the single source of truth + demo seed. Swap point for a real backend.
-      MockDetector.swift      # Fake YOLO. Swap point for Core ML.
+      MockDetector.swift      # `Detector` protocol, `Detectors.current`, and the mock fallback
+      CoreMLDetector.swift    # Vision + DebrisDetector.mlpackage (labels.first, per-class cutoffs)
       LocationManager.swift
       CameraModel.swift
       VoiceNotes.swift        # VoiceRecorder + VoicePlayer
+    ML/DebrisDetector.mlpackage # git-ignored; installed by ios/fetch-model.sh
     Views/
       Capture/CaptureView.swift   # Tab 1: full-screen camera, shutter, library button, location pill
       Capture/ReviewView.swift    # Post-shutter: suggestions → confirm/reject → Post
@@ -74,8 +77,8 @@ PRD.md
 
 ## How to run (iOS)
 
-1. Open `ios/DebrisMapper.xcodeproj` in Xcode 16 or later.
-2. Target **DebrisMapper** → Signing & Capabilities → pick your Team (bundle id `com.example.debrismapper`; change it if it collides).
+1. Fetch the model: `ios/fetch-model.sh` (needs `gh` signed in to the repo). Skip it and the app uses `MockDetector`.
+2. Open `ios/DebrisMapper.xcodeproj` in Xcode 16 or later. Signing is set to Andrew's team (`4L26YVZYX3`), bundle id `com.apandji.debrismapper`; others pick their own Team and bundle id in Signing & Capabilities.
 3. Run on an iPhone (iOS 17+) for camera + GPS. In the Simulator, set a location (Features → Location → e.g. Apple) and use the library button.
 4. To reset demo data, delete the app (seed + reports are local).
 
@@ -110,7 +113,7 @@ No CocoaPods/SPM dependencies. Keep it that way unless asked.
 
 ## What not to overbuild
 
-- No real YOLO / Core ML model in the app yet. Training tooling lives in `training/` (Python, separate from the app; v0 classes: fallen_tree, damaged_building, rubble_debris, downed_line_or_pole, fire_smoke). Keep `sources.yaml` the single dataset registry; never train on `role: test` or unreviewed prelabels. Direction is on-device Core ML (offline after storms); see `research/` for the model brief and dataset research. `MockDetector.detect(in:)` is the swap point.
+- The app runs the Core ML model on-device; don't add server-side inference. Training tooling lives in `training/` (Python, separate from the app; v0 classes: fallen_tree, damaged_building, rubble_debris, downed_line_or_pole, fire_smoke). Keep `sources.yaml` the single dataset registry; never train on `role: test` or unreviewed prelabels. Direction is on-device Core ML (offline after storms); see `research/` for the model brief and dataset research. `Detector` (in `MockDetector.swift`) is the swap point; new versions ship as releases, not in git.
 - No backend or auth until the user picks a stack (deferred until after critique). No accounts ever without asking; identity is anonymous handles.
 - No feed, comments-as-text, profiles, notifications, moderation, or multi-photo queues unless asked.
 - No AR revisit (PRD stretch goal).

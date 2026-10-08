@@ -1,9 +1,24 @@
 import UIKit
 
-/// Stand-in for a YOLO model. Returns 1–3 random suggestions after a short delay
-/// so the UI has a realistic "detecting…" beat. Swap for Core ML later; keep the signature.
-enum MockDetector {
-    static func detect(in image: UIImage) async -> [Detection] {
+/// Suggests debris boxes on a photo. Suggestions are never ground truth;
+/// people vote on them (AGENTS.md).
+protocol Detector {
+    /// Shown in the UI and saved on each suggested box, e.g. "v0". nil for the mock.
+    var modelVersion: String? { get }
+    func detect(in image: UIImage) async -> [Detection]
+}
+
+enum Detectors {
+    /// The bundled Core ML model when present, otherwise the mock.
+    static let current: Detector = CoreMLDetector() ?? MockDetector()
+}
+
+/// Stand-in used when DebrisDetector.mlpackage isn't bundled (see ios/fetch-model.sh).
+/// Returns 1–3 random suggestions after a short delay so the UI has a realistic "detecting…" beat.
+struct MockDetector: Detector {
+    let modelVersion: String? = nil
+
+    func detect(in image: UIImage) async -> [Detection] {
         try? await Task.sleep(for: .milliseconds(900))
         let count = Int.random(in: 1...3)
         return (0..<count).map { _ in
